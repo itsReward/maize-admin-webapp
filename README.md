@@ -1,70 +1,110 @@
-# Getting Started with Create React App
+# Maize Yield Prediction Admin Webapp
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A modern, responsive admin panel for managing the Maize Yield Prediction System.
+
+## Features
+
+- 📊 **Dashboard**: Real-time system statistics and insights
+- 👥 **User Management**: Complete user and farmer management
+- 🌱 **Planting Sessions**: Track and manage planting activities
+- 🌤️ **Weather Data**: Weather monitoring and historical data
+- 🧠 **ML Models**: Model training, versioning, and performance tracking
+- 📈 **Analytics**: Data visualization and trend analysis
+- ⚙️ **Settings**: System configuration and preferences
+
+## Tech Stack
+
+- **Frontend**: React 18, Tailwind CSS
+- **Charts**: Recharts
+- **Icons**: Lucide React
+- **Backend**: Spring Boot API (separate project)
+- **Database**: PostgreSQL
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (version 14 or higher)
+- npm or yarn
+- Backend API running (Spring Boot)
+
+### Installation
+
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Configure environment variables:
+   ```bash
+   cp .env.example .env
+   ```
+   Update the API URLs in `.env` file.
+
+4. Start the development server:
+   ```bash
+   npm start
+   ```
+
+5. Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+
+## Environment Variables
+
+- `REACT_APP_API_BASE_URL`: Backend API base URL
+- `REACT_APP_ML_API_BASE_URL`: ML service API base URL
+- `REACT_APP_WEATHER_API_KEY`: Weather API key (optional)
 
 ## Available Scripts
 
-In the project directory, you can run:
+- `npm start`: Run development server
+- `npm run build`: Build for production
+- `npm test`: Run tests
+- `npm run build:prod`: Production build with optimizations
+- `npm run analyze`: Analyze bundle size
 
-### `npm start`
+## Project Structure
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+```
+src/
+├── components/          # Reusable components
+│   ├── layout/         # Layout components
+│   ├── dashboard/      # Dashboard components
+│   ├── data/          # Data management components
+│   ├── models/        # ML model components
+│   └── common/        # Common UI components
+├── pages/             # Page components
+├── services/          # API services
+├── hooks/             # Custom React hooks
+├── utils/             # Utility functions
+├── context/           # React context providers
+└── styles/            # Global styles
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## API Integration
 
-### `npm test`
+The webapp integrates with the backend Spring Boot API. Make sure your backend implements the following endpoints:
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Core Endpoints
+- `GET /api/dashboard/stats` - Dashboard statistics
+- `GET /api/users` - User management
+- `GET /api/farmers` - Farmer data
+- `GET /api/planting-sessions` - Planting sessions
+- `GET /api/weather-data` - Weather information
 
-### `npm run build`
+### ML Endpoints
+- `GET /model/versions` - Model versions
+- `POST /model/train` - Train new model
+- `GET /features/importance` - Feature importance
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Contributing
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## License
 
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+This project is licensed under the MIT License.
