@@ -8,16 +8,21 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import Layout from './components/layout/Layout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+
+// Import existing pages (only the ones that exist)
 import DashboardPage from './pages/DashboardPage';
 import UsersPage from './pages/UsersPage';
-import FarmsPage from './pages/FarmsPage';
-import PlantingSessionsPage from './pages/PlantingSessionsPage';
-import WeatherPage from './pages/WeatherPage';
-import PredictionsPage from './pages/PredictionsPage';
-import ModelsPage from './pages/ModelsPage';
-import AnalyticsPage from './pages/AnalyticsPage';
 import DataExplorationPage from './pages/DataExplorationPage';
 import SettingsPage from './pages/SettingsPage';
+
+// Import new placeholder pages for missing ones
+import PlaceholderPage from './pages/PlaceholderPage';
+import WeatherPage from "./pages/WeatherPage";
+import PredictionsPage from "./pages/PredictionsPage";
+import PlantingSessionsPage from "./pages/PlantingSessionsPage";
+import FarmsPage from "./pages/FarmsPage";
+import ModelsPage from "./pages/ModelsPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 
 function App() {
   return (
