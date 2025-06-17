@@ -1,91 +1,73 @@
-import React, { useState, useEffect, useContext, createContext, useCallback } from 'react';
-import { 
-  Users, 
-  Sprout, 
-  TrendingUp, 
-  Database, 
-  Cloud, 
-  Settings, 
-  BarChart3, 
-  Activity,
-  Calendar,
-  MapPin,
-  Brain,
-  Download,
-  Upload,
-  Play,
-  Eye,
-  Filter,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  Home,
-  User,
-  TreePine,
-  Thermometer,
-  Target,
-  Zap,
-  LineChart,
-  PieChart,
-  Gauge,
-  Layers,
-  AlertCircle,
-  CheckCircle,
-  RefreshCw
-} from 'lucide-react';
-import { LineChart, Line, BarChart, Bar, PieChart as RechartsPieChart, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+// src/App.js
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
-// Import services and components
-import ApiService from './services/apiService';
-import { useApi } from './hooks/useApi';
-import LoadingSpinner from './components/common/LoadingSpinner';
-import ErrorMessage from './components/common/ErrorMessage';
-import Header from './components/layout/Header';
-import Sidebar from './components/layout/Sidebar';
-import Dashboard from './pages/DashboardPage';
+// Import your existing components
+import Layout from './components/layout/Layout';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import DashboardPage from './pages/DashboardPage';
 import UsersPage from './pages/UsersPage';
-import FarmersPage from './pages/FarmersPage';
+import FarmsPage from './pages/FarmsPage';
 import PlantingSessionsPage from './pages/PlantingSessionsPage';
 import WeatherPage from './pages/WeatherPage';
-import ModelsPage from './pages/ModelManagementPage';
-import AnalyticsPage from './pages/DataExplorationPage';
+import PredictionsPage from './pages/PredictionsPage';
+import ModelsPage from './pages/ModelsPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import DataExplorationPage from './pages/DataExplorationPage';
 import SettingsPage from './pages/SettingsPage';
 
-// Context for app state
-const AppContext = createContext();
-
-// Main App Component
-const App = () => {
-  const [currentPage, setCurrentPage] = useState('dashboard');
-
-  const renderPage = () => {
-    switch (currentPage) {
-      case 'dashboard': return <Dashboard />;
-      case 'users': return <UsersPage />;
-      case 'farmers': return <FarmersPage />;
-      case 'planting': return <PlantingSessionsPage />;
-      case 'weather': return <WeatherPage />;
-      case 'models': return <ModelsPage />;
-      case 'analytics': return <AnalyticsPage />;
-      case 'settings': return <SettingsPage />;
-      default: return <Dashboard />;
-    }
-  };
-
+function App() {
   return (
-    <AppContext.Provider value={{ currentPage, setCurrentPage }}>
-      <div className="flex min-h-screen bg-gray-50">
-        <Sidebar />
-        <div className="flex-1">
-          <Header />
-          <main className="p-6">
-            {renderPage()}
-          </main>
-        </div>
-      </div>
-    </AppContext.Provider>
-  );
-};
+      <AuthProvider>
+        <Router>
+          <div className="App">
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
 
-export { AppContext };
+              {/* Protected Routes */}
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }>
+                {/* Dashboard */}
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="dashboard" element={<DashboardPage />} />
+
+                {/* User Management */}
+                <Route path="users" element={<UsersPage />} />
+
+                {/* Farm Management */}
+                <Route path="farms" element={<FarmsPage />} />
+                <Route path="planting-sessions" element={<PlantingSessionsPage />} />
+
+                {/* Weather and Data */}
+                <Route path="weather" element={<WeatherPage />} />
+                <Route path="data-exploration" element={<DataExplorationPage />} />
+
+                {/* ML and Predictions */}
+                <Route path="predictions" element={<PredictionsPage />} />
+                <Route path="models" element={<ModelsPage />} />
+
+                {/* Analytics */}
+                <Route path="analytics" element={<AnalyticsPage />} />
+
+                {/* Settings */}
+                <Route path="settings" element={<SettingsPage />} />
+              </Route>
+
+              {/* Catch all route */}
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
+          </div>
+        </Router>
+      </AuthProvider>
+  );
+}
+
 export default App;

@@ -1,18 +1,21 @@
-// API Configuration
+// src/services/apiService.js
+import authService from './authService';
+
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080/api';
-const ML_API_BASE_URL = process.env.REACT_APP_ML_API_BASE_URL || 'http://localhost:8001';
 
 class ApiService {
   constructor() {
     this.baseURL = API_BASE_URL;
-    this.mlBaseURL = ML_API_BASE_URL;
   }
 
+  // Generic request method with authentication
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
+
     const config = {
       headers: {
         'Content-Type': 'application/json',
+        ...authService.getAuthHeader(), // Add auth header automatically
         ...options.headers,
       },
       ...options,
@@ -20,190 +23,188 @@ class ApiService {
 
     try {
       const response = await fetch(url, config);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+
+      // Handle authentication errors
+      if (response.status === 401 || response.status === 403) {
+        // Token might be expired or invalid
+        authService.logout();
+        throw new Error('Authentication failed. Please login again.');
       }
-      return await response.json();
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      // Handle empty responses
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        return await response.json();
+      } else {
+        return await response.text();
+      }
     } catch (error) {
-      console.error(`API request failed: ${url}`, error);
+      console.error(`API Error (${endpoint}):`, error);
       throw error;
     }
   }
 
-  async mlRequest(endpoint, options = {}) {
-    const url = `${this.mlBaseURL}${endpoint}`;
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    };
+  // GET request
+  async get(endpoint) {
+    return this.request(endpoint, { method: 'GET' });
+  }
 
-    try {
-      const response = await fetch(url, config);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error(`ML API request failed: ${url}`, error);
-      throw error;
-    }
+  // POST request
+  async post(endpoint, data) {
+    return this.request(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // PUT request
+  async put(endpoint, data) {
+    return this.request(endpoint, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // DELETE request
+  async delete(endpoint) {
+    return this.request(endpoint, { method: 'DELETE' });
   }
 
   // Dashboard APIs
   async getDashboardStats() {
-    return this.request('/dashboard/stats');
+    return this.get('/dashboard/stats');
   }
 
-  async getYieldTrends() {
-    return this.request('/dashboard/yield-trends');
+  async getRecentActivity() {
+    return this.get('/dashboard/recent-activity');
   }
 
   // User APIs
   async getUsers(page = 0, size = 10, search = '') {
     const params = new URLSearchParams({ page, size, search });
-    return this.request(`/users?${params}`);
+    return this.get(`/users?${params}`);
   }
 
-  async createUser(userData) {
-    return this.request('/users', {
-      method: 'POST',
-      body: JSON.stringify(userData),
-    });
+  async getCurrentUser() {
+    return this.get('/users/me');
   }
 
   async updateUser(id, userData) {
-    return this.request(`/users/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(userData),
-    });
+    return this.put(`/users/${id}`, userData);
   }
 
   async deleteUser(id) {
-    return this.request(`/users/${id}`, {
-      method: 'DELETE',
-    });
-  }
-
-  // Farmer APIs
-  async getFarmers(page = 0, size = 10, search = '') {
-    const params = new URLSearchParams({ page, size, search });
-    return this.request(`/farmers?${params}`);
-  }
-
-  async getFarmerDetails(id) {
-    return this.request(`/farmers/${id}`);
+    return this.delete(`/users/${id}`);
   }
 
   // Farm APIs
-  async getFarms(farmerId = null) {
-    const params = farmerId ? new URLSearchParams({ farmerId }) : '';
-    return this.request(`/farms?${params}`);
+  async getFarms() {
+    return this.get('/farms');
+  }
+
+  async getFarmById(id) {
+    return this.get(`/farms/${id}`);
+  }
+
+  async createFarm(farmData) {
+    return this.post('/farms', farmData);
+  }
+
+  async updateFarm(id, farmData) {
+    return this.put(`/farms/${id}`, farmData);
+  }
+
+  async deleteFarm(id) {
+    return this.delete(`/farms/${id}`);
   }
 
   // Planting Session APIs
-  async getPlantingSessions(page = 0, size = 10, search = '') {
-    const params = new URLSearchParams({ page, size, search });
-    return this.request(`/planting-sessions?${params}`);
+  async getPlantingSessions(farmId) {
+    return this.get(`/farms/${farmId}/planting-sessions`);
   }
 
-  async getPlantingSessionDetails(id) {
-    return this.request(`/planting-sessions/${id}`);
+  async getPlantingSessionById(sessionId) {
+    return this.get(`/planting-sessions/${sessionId}`);
   }
 
-  async createPlantingSession(sessionData) {
-    return this.request('/planting-sessions', {
-      method: 'POST',
-      body: JSON.stringify(sessionData),
-    });
+  async createPlantingSession(farmId, sessionData) {
+    return this.post(`/farms/${farmId}/planting-sessions`, sessionData);
+  }
+
+  async updatePlantingSession(sessionId, sessionData) {
+    return this.put(`/planting-sessions/${sessionId}`, sessionData);
+  }
+
+  async deletePlantingSession(sessionId) {
+    return this.delete(`/planting-sessions/${sessionId}`);
   }
 
   // Weather APIs
-  async getWeatherData(farmId = null, startDate = null, endDate = null) {
-    const params = new URLSearchParams();
-    if (farmId) params.append('farmId', farmId);
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-    return this.request(`/weather-data?${params}`);
+  async getWeatherData(location) {
+    return this.get(`/weather?location=${encodeURIComponent(location)}`);
   }
 
-  // Yield APIs
-  async getYieldHistory(plantingSessionId = null) {
-    const params = plantingSessionId ? new URLSearchParams({ plantingSessionId }) : '';
-    return this.request(`/yield-history?${params}`);
+  async getWeatherHistory(farmId, startDate, endDate) {
+    const params = new URLSearchParams({ farmId, startDate, endDate });
+    return this.get(`/weather/history?${params}`);
   }
 
-  async getYieldPredictions(plantingSessionId = null) {
-    const params = plantingSessionId ? new URLSearchParams({ plantingSessionId }) : '';
-    return this.request(`/yield-predictions?${params}`);
+  // Prediction APIs
+  async createPrediction(predictionData) {
+    return this.post('/predictions', predictionData);
   }
 
-  // Recommendation APIs
-  async getRecommendations(plantingSessionId = null) {
-    const params = plantingSessionId ? new URLSearchParams({ plantingSessionId }) : '';
-    return this.request(`/recommendations?${params}`);
+  async getPredictions(farmId) {
+    return this.get(`/predictions?farmId=${farmId}`);
   }
 
-  // ML Model APIs
+  async getPredictionById(id) {
+    return this.get(`/predictions/${id}`);
+  }
+
+  // Model APIs
   async getModelVersions() {
-    return this.mlRequest('/model/versions');
+    return this.get('/models/versions');
   }
 
-  async getCurrentModel() {
-    return this.mlRequest('/model/status');
+  async trainModel(trainingData) {
+    return this.post('/models/train', trainingData);
   }
 
-  async trainModel(trainingConfig) {
-    return this.mlRequest('/model/train', {
-      method: 'POST',
-      body: JSON.stringify(trainingConfig),
-    });
-  }
-
-  async loadModelVersion(version) {
-    return this.mlRequest(`/model/load-version/${version}`, {
-      method: 'POST',
-    });
-  }
-
-  async getFeatureImportance() {
-    return this.mlRequest('/features/importance');
-  }
-
-  async makePrediction(inputData) {
-    return this.mlRequest('/predict', {
-      method: 'POST',
-      body: JSON.stringify(inputData),
-    });
+  async getModelMetrics(modelId) {
+    return this.get(`/models/${modelId}/metrics`);
   }
 
   // Analytics APIs
-  async getCropDistribution() {
-    return this.request('/analytics/crop-distribution');
-  }
-
-  async getRegionalPerformance() {
-    return this.request('/analytics/regional-performance');
-  }
-
-  async getModelAccuracyTrends() {
-    return this.request('/analytics/model-accuracy-trends');
+  async getAnalytics(type, params = {}) {
+    const queryParams = new URLSearchParams(params);
+    return this.get(`/analytics/${type}?${queryParams}`);
   }
 
   // Settings APIs
   async getSettings() {
-    return this.request('/settings');
+    return this.get('/settings');
   }
 
   async updateSettings(settings) {
-    return this.request('/settings', {
-      method: 'PUT',
-      body: JSON.stringify(settings),
-    });
+    return this.put('/settings', settings);
+  }
+
+  // Health check
+  async healthCheck() {
+    try {
+      return await this.get('/health');
+    } catch (error) {
+      throw new Error('Backend service is not available');
+    }
   }
 }
 
+// Create and export singleton instance
 const apiService = new ApiService();
 export default apiService;

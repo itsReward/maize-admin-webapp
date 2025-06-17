@@ -55,3 +55,4 @@ const PlantingSessionsPage = () => {
   );
 };
 
+export default PlantingSessionsPage;
