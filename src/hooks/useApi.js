@@ -13,7 +13,13 @@ export const useApi = (apiFunction, dependencies = []) => {
       const result = await apiFunction();
       setData(result);
     } catch (err) {
-      setError(err);
+      // Convert error to a consistent format
+      const errorMessage = err instanceof Error ? err.message :
+          err && typeof err === 'object' && err.message ? err.message :
+              typeof err === 'string' ? err :
+                  'An unexpected error occurred';
+
+      setError(errorMessage);
       console.error('API Error:', err);
     } finally {
       setLoading(false);

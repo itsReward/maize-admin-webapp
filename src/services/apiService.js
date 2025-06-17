@@ -24,11 +24,18 @@ class ApiService {
     try {
       const response = await fetch(url, config);
 
-      // Handle authentication errors
-      if (response.status === 401 || response.status === 403) {
-        // Token might be expired or invalid
+      // Handle authentication errors - but be more specific
+      if (response.status === 401) {
+        // Only logout on 401 (Unauthorized) - token is definitely invalid
         authService.logout();
         throw new Error('Authentication failed. Please login again.');
+      }
+
+      if (response.status === 403) {
+        // For 403 (Forbidden), don't automatically logout
+        // This could be missing endpoints or insufficient permissions
+        console.warn(`Access forbidden to ${endpoint}. This might be a missing endpoint or insufficient permissions.`);
+        throw new Error(`Access forbidden to ${endpoint.replace('/api', '')}`);
       }
 
       if (!response.ok) {
@@ -84,6 +91,12 @@ class ApiService {
     return this.get('/dashboard/recent-activity');
   }
 
+  // Analytics API
+  async getAnalytics(type, params = {}) {
+    const queryParams = new URLSearchParams(params);
+    return this.get(`/analytics/${type}?${queryParams}`);
+  }
+
   // User APIs
   async getUsers(page = 0, size = 10, search = '') {
     const params = new URLSearchParams({ page, size, search });
@@ -92,6 +105,14 @@ class ApiService {
 
   async getCurrentUser() {
     return this.get('/users/me');
+  }
+
+  async getUserById(id) {
+    return this.get(`/users/${id}`);
+  }
+
+  async createUser(userData) {
+    return this.post('/users', userData);
   }
 
   async updateUser(id, userData) {
@@ -103,8 +124,9 @@ class ApiService {
   }
 
   // Farm APIs
-  async getFarms() {
-    return this.get('/farms');
+  async getFarms(page = 0, size = 10, search = '') {
+    const params = new URLSearchParams({ page, size, search });
+    return this.get(`/farms?${params}`);
   }
 
   async getFarmById(id) {
@@ -123,85 +145,54 @@ class ApiService {
     return this.delete(`/farms/${id}`);
   }
 
-  // Planting Session APIs
-  async getPlantingSessions(farmId) {
-    return this.get(`/farms/${farmId}/planting-sessions`);
-  }
-
-  async getPlantingSessionById(sessionId) {
-    return this.get(`/planting-sessions/${sessionId}`);
-  }
-
-  async createPlantingSession(farmId, sessionData) {
-    return this.post(`/farms/${farmId}/planting-sessions`, sessionData);
-  }
-
-  async updatePlantingSession(sessionId, sessionData) {
-    return this.put(`/planting-sessions/${sessionId}`, sessionData);
-  }
-
-  async deletePlantingSession(sessionId) {
-    return this.delete(`/planting-sessions/${sessionId}`);
-  }
-
-  // Weather APIs
-  async getWeatherData(location) {
-    return this.get(`/weather?location=${encodeURIComponent(location)}`);
-  }
-
-  async getWeatherHistory(farmId, startDate, endDate) {
-    const params = new URLSearchParams({ farmId, startDate, endDate });
-    return this.get(`/weather/history?${params}`);
-  }
-
   // Prediction APIs
-  async createPrediction(predictionData) {
-    return this.post('/predictions', predictionData);
+  async getPredictions(sessionId = null, page = 0, size = 10) {
+    const params = new URLSearchParams({ page, size });
+    if (sessionId) params.append('sessionId', sessionId);
+    return this.get(`/predictions?${params}`);
   }
 
-  async getPredictions(farmId) {
-    return this.get(`/predictions?farmId=${farmId}`);
+  async generatePrediction(sessionId, predictionData) {
+    return this.post(`/planting-sessions/${sessionId}/predictions`, predictionData);
   }
 
   async getPredictionById(id) {
     return this.get(`/predictions/${id}`);
   }
 
-  // Model APIs
-  async getModelVersions() {
-    return this.get('/models/versions');
+  // Weather APIs
+  async getWeatherData(location = null, startDate = null, endDate = null) {
+    const params = new URLSearchParams();
+    if (location) params.append('location', location);
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+    return this.get(`/weather-data?${params}`);
   }
 
-  async trainModel(trainingData) {
-    return this.post('/models/train', trainingData);
+  async getCurrentWeather(location) {
+    return this.get(`/weather-data/current?location=${location}`);
   }
 
-  async getModelMetrics(modelId) {
-    return this.get(`/models/${modelId}/metrics`);
+  // Planting Session APIs
+  async getPlantingSessions(page = 0, size = 10, search = '') {
+    const params = new URLSearchParams({ page, size, search });
+    return this.get(`/planting-sessions?${params}`);
   }
 
-  // Analytics APIs
-  async getAnalytics(type, params = {}) {
-    const queryParams = new URLSearchParams(params);
-    return this.get(`/analytics/${type}?${queryParams}`);
+  async getPlantingSessionById(id) {
+    return this.get(`/planting-sessions/${id}`);
   }
 
-  // Settings APIs
-  async getSettings() {
-    return this.get('/settings');
+  async createPlantingSession(sessionData) {
+    return this.post('/planting-sessions', sessionData);
   }
 
-  async updateSettings(settings) {
-    return this.put('/settings', settings);
+  async updatePlantingSession(id, sessionData) {
+    return this.put(`/planting-sessions/${id}`, sessionData);
   }
 
-  // Health check
-  async healthCheck() {
-    try {
-      return await this.get('/health');
-    } catch (error) {
-      throw new Error('Backend service is not available');
-    }
+  async deleteePlantingSession(id) {
+    return this.delete(`/planting-sessions/${id}`);
   }
 }
 
