@@ -1,7 +1,7 @@
 // src/pages/LoginPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import authService from '../services/authService';
+import { useAuth } from '../context/AuthContext'; // Use AuthContext instead
 import { Eye, EyeOff, User, Lock, Sprout } from 'lucide-react';
 
 const LoginPage = () => {
@@ -14,12 +14,15 @@ const LoginPage = () => {
     const [error, setError] = useState('');
     const navigate = useNavigate();
 
-    // Redirect if already authenticated
+    // Use AuthContext instead of direct authService
+    const { isAuthenticated, loading: authLoading, login } = useAuth();
+
+    // Redirect if already authenticated - but only after auth loading is complete
     useEffect(() => {
-        if (authService.isAuthenticated()) {
-            navigate('/dashboard');
+        if (!authLoading && isAuthenticated) {
+            navigate('/dashboard', { replace: true });
         }
-    }, [navigate]);
+    }, [isAuthenticated, authLoading, navigate]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -43,10 +46,8 @@ const LoginPage = () => {
         setError('');
 
         try {
-            await authService.login(formData);
-
-            // Login successful, redirect to dashboard
-            navigate('/dashboard', { replace: true });
+            await login(formData);
+            // Navigation will be handled by the useEffect above
         } catch (error) {
             setError(error.message || 'Login failed. Please try again.');
         } finally {
@@ -57,6 +58,18 @@ const LoginPage = () => {
     const handleRegisterRedirect = () => {
         navigate('/register');
     };
+
+    // Show loading while auth is initializing
+    if (authLoading) {
+        return (
+            <div className="min-h-screen bg-gradient-to-br from-green-400 via-green-500 to-green-600 flex items-center justify-center">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto"></div>
+                    <p className="mt-4 text-white">Loading...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-green-400 via-green-500 to-green-600 flex items-center justify-center p-4">
@@ -84,10 +97,10 @@ const LoginPage = () => {
                 )}
 
                 {/* Login Form */}
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-4">
                     {/* Username Field */}
                     <div>
-                        <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
                             Username
                         </label>
                         <div className="relative">
@@ -95,14 +108,15 @@ const LoginPage = () => {
                                 <User className="h-5 w-5 text-gray-400" />
                             </div>
                             <input
+                                type="text"
                                 id="username"
                                 name="username"
-                                type="text"
-                                required
                                 value={formData.username}
                                 onChange={handleInputChange}
-                                className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                 placeholder="Enter your username"
+                                required
+                                autoComplete="username"
                                 disabled={loading}
                             />
                         </div>
@@ -110,7 +124,7 @@ const LoginPage = () => {
 
                     {/* Password Field */}
                     <div>
-                        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                             Password
                         </label>
                         <div className="relative">
@@ -118,20 +132,21 @@ const LoginPage = () => {
                                 <Lock className="h-5 w-5 text-gray-400" />
                             </div>
                             <input
+                                type={showPassword ? "text" : "password"}
                                 id="password"
                                 name="password"
-                                type={showPassword ? 'text' : 'password'}
-                                required
                                 value={formData.password}
                                 onChange={handleInputChange}
-                                className="block w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-colors"
+                                className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                 placeholder="Enter your password"
+                                required
+                                autoComplete="current-password"
                                 disabled={loading}
                             />
                             <button
                                 type="button"
-                                onClick={() => setShowPassword(!showPassword)}
                                 className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                                onClick={() => setShowPassword(!showPassword)}
                                 disabled={loading}
                             >
                                 {showPassword ? (
@@ -147,12 +162,12 @@ const LoginPage = () => {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                         {loading ? (
                             <div className="flex items-center justify-center">
-                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                <span className="ml-2">Signing in...</span>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Signing in...
                             </div>
                         ) : (
                             'Sign In'
@@ -162,27 +177,16 @@ const LoginPage = () => {
 
                 {/* Register Link */}
                 <div className="mt-6 text-center">
-                    <p className="text-sm text-gray-600">
+                    <p className="text-gray-600">
                         Don't have an account?{' '}
                         <button
                             onClick={handleRegisterRedirect}
-                            className="font-medium text-green-600 hover:text-green-500 transition-colors"
+                            className="text-green-600 hover:text-green-700 font-medium transition-colors"
                             disabled={loading}
                         >
-                            Register here
+                            Sign up here
                         </button>
                     </p>
-                </div>
-
-                {/* Demo Credentials */}
-                <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-600 text-center mb-2 font-medium">
-                        Demo Credentials (if available)
-                    </p>
-                    <div className="text-xs text-gray-500 text-center space-y-1">
-                        <p>Username: admin</p>
-                        <p>Password: admin123</p>
-                    </div>
                 </div>
             </div>
         </div>

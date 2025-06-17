@@ -20,21 +20,30 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const initializeAuth = async () => {
             try {
+                // First check if there's a token stored locally
                 const isAuth = authService.isAuthenticated();
 
                 if (isAuth) {
-                    // Validate session with backend
-                    const isValid = await authService.validateSession();
+                    // Only validate with backend if we have a valid local token
+                    try {
+                        const isValid = await authService.validateSession();
 
-                    if (isValid) {
+                        if (isValid) {
+                            const userData = authService.getUserData();
+                            setUser(userData);
+                            setIsAuthenticated(true);
+                        } else {
+                            // Session is invalid, clear everything
+                            authService.logout();
+                            setUser(null);
+                            setIsAuthenticated(false);
+                        }
+                    } catch (validationError) {
+                        console.error('Session validation failed:', validationError);
+                        // If validation fails, still set local auth state but don't redirect
                         const userData = authService.getUserData();
                         setUser(userData);
                         setIsAuthenticated(true);
-                    } else {
-                        // Session is invalid, clear everything
-                        authService.logout();
-                        setUser(null);
-                        setIsAuthenticated(false);
                     }
                 } else {
                     setUser(null);
@@ -80,6 +89,7 @@ export const AuthProvider = ({ children }) => {
         authService.logout();
         setUser(null);
         setIsAuthenticated(false);
+        // Don't redirect here, let the logout method in authService handle it
     };
 
     const register = async (userData) => {
