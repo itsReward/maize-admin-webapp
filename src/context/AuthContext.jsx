@@ -1,4 +1,4 @@
-// src/context/AuthContext.jsx - Enhanced with better session handling
+// src/context/AuthContext.jsx - Enhanced to handle missing endpoints gracefully
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import authService from '../services/authService';
 
@@ -17,6 +17,7 @@ export const AuthProvider = ({ children }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [loading, setLoading] = useState(true);
     const [sessionValidated, setSessionValidated] = useState(false);
+    const [errors, setErrors] = useState([]);
 
     // Debug logging
     const log = (...args) => {
@@ -27,6 +28,35 @@ export const AuthProvider = ({ children }) => {
 
     const error = (...args) => {
         console.error('❌ [AuthContext]', ...args);
+    };
+
+    // Add error to the errors array
+    const addError = (errorInfo) => {
+        const errorId = Date.now();
+        const newError = { id: errorId, timestamp: new Date(), ...errorInfo };
+
+        setErrors(prev => {
+            // Keep only last 10 errors
+            const updated = [newError, ...prev].slice(0, 10);
+            return updated;
+        });
+
+        // Auto-remove error after 10 seconds if it's not critical
+        if (!newError.critical) {
+            setTimeout(() => {
+                setErrors(prev => prev.filter(err => err.id !== errorId));
+            }, 10000);
+        }
+    };
+
+    // Clear specific error
+    const clearError = (errorId) => {
+        setErrors(prev => prev.filter(err => err.id !== errorId));
+    };
+
+    // Clear all errors
+    const clearAllErrors = () => {
+        setErrors([]);
     };
 
     // Initialize authentication state
@@ -56,14 +86,47 @@ export const AuthProvider = ({ children }) => {
                             // Session is invalid, clear auth state
                             setUser(null);
                             setIsAuthenticated(false);
+                            addError({
+                                type: 'SESSION_EXPIRED',
+                                message: 'Your session has expired. Please log in again.',
+                                critical: true
+                            });
                             error('Session validation failed, user logged out');
                         } else {
                             setSessionValidated(true);
                         }
                     } catch (validationError) {
                         error('Session validation error:', validationError);
-                        // Keep user logged in locally if validation fails due to network issues
-                        // but don't mark session as validated
+
+                        // Handle different types of validation errors
+                        if (validationError.status === 404) {
+                            // Missing endpoint - don't logout, just note it
+                            log('Session validation endpoint not found, assuming session is valid');
+                            setSessionValidated(true);
+                            addError({
+                                type: 'MISSING_ENDPOINT',
+                                message: 'Session validation endpoint not available',
+                                critical: false
+                            });
+                        } else if (validationError.status === 401 || validationError.status === 403) {
+                            // Actual auth error - logout
+                            setUser(null);
+                            setIsAuthenticated(false);
+                            addError({
+                                type: 'AUTHENTICATION_ERROR',
+                                message: 'Authentication failed. Please log in again.',
+                                critical: true
+                            });
+                        } else {
+                            // Network or server error - keep user logged in
+                            log('Network/server error during validation, keeping user logged in');
+                            setSessionValidated(false); // Mark as not validated but keep authenticated
+                            addError({
+                                type: 'VALIDATION_ERROR',
+                                message: 'Unable to validate session due to server issues',
+                                critical: false
+                            });
+                        }
                     }
                 } else {
                     log('User not authenticated locally');
@@ -74,6 +137,11 @@ export const AuthProvider = ({ children }) => {
                 error('Auth initialization error:', initError);
                 setUser(null);
                 setIsAuthenticated(false);
+                addError({
+                    type: 'INITIALIZATION_ERROR',
+                    message: 'Failed to initialize authentication',
+                    critical: false
+                });
             } finally {
                 setLoading(false);
             }
@@ -94,38 +162,37 @@ export const AuthProvider = ({ children }) => {
         return removeListener;
     }, []);
 
-    // Periodic session validation
-    useEffect(() => {
-        if (!isAuthenticated || !sessionValidated) {
-            return;
-        }
-
-        const validatePeriodically = async () => {
-            try {
-                const isValid = await authService.validateSession();
-                if (!isValid) {
-                    log('Periodic session validation failed');
-                    setUser(null);
-                    setIsAuthenticated(false);
-                    setSessionValidated(false);
-                }
-            } catch (error) {
-                error('Periodic session validation error:', error);
-            }
-        };
-
-        // Validate session every 5 minutes
-        const interval = setInterval(validatePeriodically, 5 * 60 * 1000);
-
-        return () => clearInterval(interval);
-    }, [isAuthenticated, sessionValidated]);
-
-    // Handle API response errors globally
+    // Handle API response errors globally - but be selective about logout
     useEffect(() => {
         const handleGlobalAuthError = (event) => {
-            if (event.detail && (event.detail.status === 401 || event.detail.status === 403)) {
-                error('Global auth error detected:', event.detail);
+            const { status, endpoint, error: errorDetail } = event.detail;
+
+            log('Global auth error detected:', event.detail);
+
+            // Only logout for specific authentication errors
+            const shouldLogout = (status === 401 || status === 403) &&
+                !endpoint.includes('/health') &&
+                !endpoint.includes('/dashboard/stats') &&
+                !endpoint.includes('/dashboard/recent-activity');
+
+            if (shouldLogout) {
+                error('Critical auth error, logging out:', event.detail);
                 logout();
+                addError({
+                    type: 'AUTHENTICATION_ERROR',
+                    message: errorDetail.message || 'Authentication failed',
+                    critical: true
+                });
+            } else {
+                // Non-critical error, just log it
+                log('Non-critical API error, not logging out:', event.detail);
+                addError({
+                    type: errorDetail.type || 'API_ERROR',
+                    message: errorDetail.message || 'API request failed',
+                    endpoint,
+                    status,
+                    critical: false
+                });
             }
         };
 
@@ -136,6 +203,7 @@ export const AuthProvider = ({ children }) => {
     const login = async (credentials) => {
         try {
             setLoading(true);
+            clearAllErrors(); // Clear any previous errors
             log('Attempting login:', credentials.username);
 
             const response = await authService.login(credentials);
@@ -157,6 +225,13 @@ export const AuthProvider = ({ children }) => {
             setUser(null);
             setIsAuthenticated(false);
             setSessionValidated(false);
+
+            addError({
+                type: 'LOGIN_ERROR',
+                message: error.message || 'Login failed',
+                critical: true
+            });
+
             throw error;
         } finally {
             setLoading(false);
@@ -169,6 +244,7 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
         setIsAuthenticated(false);
         setSessionValidated(false);
+        clearAllErrors();
 
         authService.logout(redirect);
     };
@@ -176,10 +252,16 @@ export const AuthProvider = ({ children }) => {
     const register = async (userData) => {
         try {
             setLoading(true);
+            clearAllErrors();
             log('Attempting registration:', userData.username);
             return await authService.register(userData);
         } catch (error) {
             error('Registration failed:', error);
+            addError({
+                type: 'REGISTRATION_ERROR',
+                message: error.message || 'Registration failed',
+                critical: false
+            });
             throw error;
         } finally {
             setLoading(false);
@@ -189,9 +271,20 @@ export const AuthProvider = ({ children }) => {
     const changePassword = async (passwordData) => {
         try {
             log('Attempting password change');
-            return await authService.changePassword(passwordData);
+            const result = await authService.changePassword(passwordData);
+            addError({
+                type: 'SUCCESS',
+                message: 'Password changed successfully',
+                critical: false
+            });
+            return result;
         } catch (error) {
             error('Password change failed:', error);
+            addError({
+                type: 'PASSWORD_CHANGE_ERROR',
+                message: error.message || 'Password change failed',
+                critical: false
+            });
             throw error;
         }
     };
@@ -207,14 +300,33 @@ export const AuthProvider = ({ children }) => {
             const isValid = await authService.validateSession();
 
             if (!isValid) {
-                logout();
+                // Don't automatically logout, just mark as not validated
+                setSessionValidated(false);
+                addError({
+                    type: 'SESSION_VALIDATION_FAILED',
+                    message: 'Session validation failed',
+                    critical: false
+                });
                 return false;
             }
 
             setSessionValidated(true);
+            clearAllErrors();
             return true;
         } catch (error) {
             error('Session refresh failed:', error);
+
+            if (error.status === 404) {
+                // Missing endpoint, assume session is valid
+                setSessionValidated(true);
+                return true;
+            }
+
+            addError({
+                type: 'SESSION_REFRESH_ERROR',
+                message: 'Unable to refresh session',
+                critical: false
+            });
             return false;
         } finally {
             setLoading(false);
@@ -226,17 +338,22 @@ export const AuthProvider = ({ children }) => {
         isAuthenticated,
         loading,
         sessionValidated,
+        errors,
         login,
         logout,
         register,
         changePassword,
         refreshSession,
+        clearError,
+        clearAllErrors,
+        addError,
         // Debug helpers
         getDebugInfo: () => ({
             user,
             isAuthenticated,
             loading,
             sessionValidated,
+            errors,
             authServiceDebug: authService.getDebugInfo()
         })
     };
