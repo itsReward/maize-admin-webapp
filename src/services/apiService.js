@@ -67,7 +67,12 @@ class ApiService {
             if (response.status === 401 || response.status === 403) {
                 const error = new Error('Authentication failed. Please login again.');
                 this.logError(options.method || 'GET', url, error, duration);
-                authService.logout();
+
+                // Emit global auth error event instead of immediately logging out
+                window.dispatchEvent(new CustomEvent('auth-error', {
+                    detail: { status: response.status, endpoint, error }
+                }));
+
                 throw error;
             }
 
