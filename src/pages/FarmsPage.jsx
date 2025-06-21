@@ -25,6 +25,42 @@ const FarmsPage = () => {
         []
     );
 
+    // Safe data handling with fallbacks
+    const farmData = React.useMemo(() => {
+        // Ensure we always have an array to work with
+        if (!farms) {
+            console.log('🔍 Farms data is null/undefined, using empty array');
+            return [];
+        }
+
+        if (!Array.isArray(farms)) {
+            console.log('🔍 Farms data is not an array:', typeof farms, farms);
+            // Try to extract array from paginated response
+            if (farms.content && Array.isArray(farms.content)) {
+                console.log('🔍 Extracting farms from paginated response');
+                return farms.content;
+            }
+            // Last resort: return empty array
+            console.warn('⚠️ Could not extract array from farms data, using empty array');
+            return [];
+        }
+
+        return farms;
+    }, [farms]);
+
+    // Debug logging
+    React.useEffect(() => {
+        console.log('🏠 FarmsPage render state:', {
+            loading,
+            error: error?.message,
+            farmsRawData: farms,
+            farmDataArray: farmData,
+            farmDataLength: farmData?.length,
+            farmDataType: typeof farmData,
+            isArray: Array.isArray(farmData)
+        });
+    }, [loading, error, farms, farmData]);
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({
@@ -48,6 +84,7 @@ const FarmsPage = () => {
             });
             refetch();
         } catch (error) {
+            console.error('❌ Failed to create farm:', error);
             alert(`Failed to create farm: ${error.message}`);
         }
     };
@@ -63,36 +100,78 @@ const FarmsPage = () => {
                 await apiService.deleteFarm(farmId);
                 refetch();
             } catch (error) {
+                console.error('❌ Failed to delete farm:', error);
                 alert(`Failed to delete farm: ${error.message}`);
             }
         }
     };
 
+    // Safe calculation helpers
+    const getTotalFarms = () => {
+        return Array.isArray(farmData) ? farmData.length : 0;
+    };
+
+    const getTotalArea = () => {
+        if (!Array.isArray(farmData) || farmData.length === 0) return 0;
+        try {
+            return farmData.reduce((sum, farm) => sum + (parseFloat(farm.size) || 0), 0);
+        } catch (error) {
+            console.error('❌ Error calculating total area:', error);
+            return 0;
+        }
+    };
+
+    const getAverageSize = () => {
+        const totalFarms = getTotalFarms();
+        if (totalFarms === 0) return 0;
+        return getTotalArea() / totalFarms;
+    };
+
     const columns = [
-        { key: 'name', label: 'Farm Name' },
-        { key: 'location', label: 'Location', render: (value) => (
+        {
+            key: 'name',
+            label: 'Farm Name',
+            render: (value) => value || 'N/A'
+        },
+        {
+            key: 'location',
+            label: 'Location',
+            render: (value) => (
                 <div className="flex items-center">
                     <MapPin className="w-4 h-4 text-gray-400 mr-2" />
                     {value || 'N/A'}
                 </div>
-            )},
-        { key: 'size', label: 'Size (hectares)', render: (value) =>
-                value ? `${value} ha` : 'N/A'
+            )
         },
-        { key: 'soilType', label: 'Soil Type' },
-        { key: 'ownerName', label: 'Owner', render: (value) => (
+        {
+            key: 'size',
+            label: 'Size (hectares)',
+            render: (value) => value ? `${parseFloat(value).toFixed(1)} ha` : 'N/A'
+        },
+        {
+            key: 'soilType',
+            label: 'Soil Type',
+            render: (value) => value || 'N/A'
+        },
+        {
+            key: 'ownerName',
+            label: 'Owner',
+            render: (value) => (
                 <div className="flex items-center">
                     <User className="w-4 h-4 text-gray-400 mr-2" />
                     {value || 'N/A'}
                 </div>
-            )},
-        { key: 'createdAt', label: 'Created', render: (value) => (
-                <div className="flex items-center">
-                    <Calendar className="w-4 h-4 text-gray-400 mr-2" />
-                    {value ? new Date(value).toLocaleDateString() : 'N/A'}
-                </div>
-            )},
-        { key: 'actions', label: 'Actions', render: (_, farm) => (
+            )
+        },
+        {
+            key: 'contactNumber',
+            label: 'Contact',
+            render: (value) => value || 'N/A'
+        },
+        {
+            key: 'actions',
+            label: 'Actions',
+            render: (_, farm) => (
                 <div className="flex space-x-2">
                     <button
                         onClick={() => handleViewFarm(farm)}
@@ -116,44 +195,43 @@ const FarmsPage = () => {
                         <Trash2 className="w-4 h-4" />
                     </button>
                 </div>
-            )}
+            )
+        }
     ];
 
-    // Mock data if API fails
+    // Mock data for development/fallback
     const mockFarms = [
         {
             id: 1,
             name: 'Green Valley Farm',
             location: 'Harare, Zimbabwe',
             size: 25.5,
-            soilType: 'Clay Loam',
+            soilType: 'Loamy',
             ownerName: 'John Mukamuri',
-            contactNumber: '+263 77 123 4567',
-            createdAt: '2024-01-15'
+            contactNumber: '+263 77 123 4567'
         },
         {
             id: 2,
             name: 'Sunrise Agriculture',
             location: 'Bulawayo, Zimbabwe',
             size: 40.2,
-            soilType: 'Sandy Loam',
-            ownerName: 'Mary Chivhayo',
-            contactNumber: '+263 71 987 6543',
-            createdAt: '2024-02-20'
+            soilType: 'Clay',
+            ownerName: 'Mary Chikwanha',
+            contactNumber: '+263 71 987 6543'
         },
         {
             id: 3,
             name: 'Highland Farms',
             location: 'Mutare, Zimbabwe',
             size: 18.7,
-            soilType: 'Red Clay',
+            soilType: 'Sandy Loam',
             ownerName: 'Peter Moyo',
-            contactNumber: '+263 78 456 7890',
-            createdAt: '2024-03-10'
+            contactNumber: '+263 78 456 7890'
         }
     ];
 
-    const farmData = error ? mockFarms : (farms || []);
+    // Use mock data if there's an error and no real data
+    const displayData = error && farmData.length === 0 ? mockFarms : farmData;
 
     return (
         <div className="space-y-6">
@@ -172,13 +250,28 @@ const FarmsPage = () => {
                 </button>
             </div>
 
+            {/* Debug Info (only in development) */}
+            {process.env.NODE_ENV === 'development' && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-yellow-800 mb-2">Debug Info:</h4>
+                    <div className="text-sm text-yellow-700 space-y-1">
+                        <div>Loading: {loading ? 'Yes' : 'No'}</div>
+                        <div>Error: {error ? error.message : 'None'}</div>
+                        <div>Raw Data Type: {typeof farms}</div>
+                        <div>Is Array: {Array.isArray(farmData) ? 'Yes' : 'No'}</div>
+                        <div>Farm Count: {farmData.length}</div>
+                        <div>Using Mock Data: {error && farmData.length === 0 ? 'Yes' : 'No'}</div>
+                    </div>
+                </div>
+            )}
+
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-gray-600">Total Farms</p>
-                            <p className="text-3xl font-bold text-gray-900">{farmData.length}</p>
+                            <p className="text-3xl font-bold text-gray-900">{getTotalFarms()}</p>
                         </div>
                         <div className="bg-green-100 p-3 rounded-lg">
                             <MapPin className="w-6 h-6 text-green-600" />
@@ -191,7 +284,7 @@ const FarmsPage = () => {
                         <div>
                             <p className="text-sm font-medium text-gray-600">Total Area</p>
                             <p className="text-3xl font-bold text-gray-900">
-                                {farmData.reduce((sum, farm) => sum + (farm.size || 0), 0).toFixed(1)} ha
+                                {getTotalArea().toFixed(1)} ha
                             </p>
                         </div>
                         <div className="bg-blue-100 p-3 rounded-lg">
@@ -204,7 +297,7 @@ const FarmsPage = () => {
                     <div className="flex items-center justify-between">
                         <div>
                             <p className="text-sm font-medium text-gray-600">Active Farmers</p>
-                            <p className="text-3xl font-bold text-gray-900">{farmData.length}</p>
+                            <p className="text-3xl font-bold text-gray-900">{getTotalFarms()}</p>
                         </div>
                         <div className="bg-purple-100 p-3 rounded-lg">
                             <User className="w-6 h-6 text-purple-600" />
@@ -217,10 +310,7 @@ const FarmsPage = () => {
                         <div>
                             <p className="text-sm font-medium text-gray-600">Avg Farm Size</p>
                             <p className="text-3xl font-bold text-gray-900">
-                                {farmData.length > 0
-                                    ? (farmData.reduce((sum, farm) => sum + (farm.size || 0), 0) / farmData.length).toFixed(1)
-                                    : '0'
-                                } ha
+                                {getAverageSize().toFixed(1)} ha
                             </p>
                         </div>
                         <div className="bg-yellow-100 p-3 rounded-lg">
@@ -230,12 +320,33 @@ const FarmsPage = () => {
                 </div>
             </div>
 
+            {/* Error Alert */}
+            {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="flex items-center">
+                        <div className="text-red-800">
+                            <h4 className="font-semibold">Failed to load farms data</h4>
+                            <p className="text-sm mt-1">
+                                {error.message}.
+                                {farmData.length === 0 && ' Showing sample data below.'}
+                            </p>
+                            <button
+                                onClick={refetch}
+                                className="mt-2 bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                            >
+                                Try Again
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Farms Table */}
             <DataTable
                 columns={columns}
-                data={farmData}
+                data={displayData}
                 loading={loading}
-                error={error}
+                error={null} // We handle error display above
                 onRetry={refetch}
                 emptyMessage="No farms found. Add your first farm to get started."
             />
@@ -245,122 +356,110 @@ const FarmsPage = () => {
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
                 title="Add New Farm"
-                size="lg"
             >
                 <form onSubmit={handleCreateFarm} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Farm Name *
-                            </label>
-                            <input
-                                type="text"
-                                name="name"
-                                value={formData.name}
-                                onChange={handleInputChange}
-                                required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                placeholder="Enter farm name"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Location *
-                            </label>
-                            <input
-                                type="text"
-                                name="location"
-                                value={formData.location}
-                                onChange={handleInputChange}
-                                required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                placeholder="City, Province"
-                            />
-                        </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Farm Name *
+                        </label>
+                        <input
+                            type="text"
+                            name="name"
+                            value={formData.name}
+                            onChange={handleInputChange}
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            required
+                        />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Size (hectares) *
-                            </label>
-                            <input
-                                type="number"
-                                name="size"
-                                value={formData.size}
-                                onChange={handleInputChange}
-                                required
-                                step="0.1"
-                                min="0"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                placeholder="0.0"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Soil Type
-                            </label>
-                            <select
-                                name="soilType"
-                                value={formData.soilType}
-                                onChange={handleInputChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                            >
-                                <option value="">Select soil type</option>
-                                <option value="Clay">Clay</option>
-                                <option value="Clay Loam">Clay Loam</option>
-                                <option value="Sandy Loam">Sandy Loam</option>
-                                <option value="Sandy">Sandy</option>
-                                <option value="Loam">Loam</option>
-                                <option value="Red Clay">Red Clay</option>
-                            </select>
-                        </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Location *
+                        </label>
+                        <input
+                            type="text"
+                            name="location"
+                            value={formData.location}
+                            onChange={handleInputChange}
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            required
+                        />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Owner Name *
-                            </label>
-                            <input
-                                type="text"
-                                name="ownerName"
-                                value={formData.ownerName}
-                                onChange={handleInputChange}
-                                required
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                placeholder="Farm owner's name"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Contact Number
-                            </label>
-                            <input
-                                type="tel"
-                                name="contactNumber"
-                                value={formData.contactNumber}
-                                onChange={handleInputChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
-                                placeholder="+263 77 123 4567"
-                            />
-                        </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Size (hectares) *
+                        </label>
+                        <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            name="size"
+                            value={formData.size}
+                            onChange={handleInputChange}
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            required
+                        />
                     </div>
 
-                    <div className="flex justify-end space-x-3 pt-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Soil Type
+                        </label>
+                        <select
+                            name="soilType"
+                            value={formData.soilType}
+                            onChange={handleInputChange}
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                        >
+                            <option value="">Select soil type</option>
+                            <option value="Loamy">Loamy</option>
+                            <option value="Clay">Clay</option>
+                            <option value="Sandy">Sandy</option>
+                            <option value="Sandy Loam">Sandy Loam</option>
+                            <option value="Clay Loam">Clay Loam</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Owner Name *
+                        </label>
+                        <input
+                            type="text"
+                            name="ownerName"
+                            value={formData.ownerName}
+                            onChange={handleInputChange}
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            required
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Contact Number
+                        </label>
+                        <input
+                            type="tel"
+                            name="contactNumber"
+                            value={formData.contactNumber}
+                            onChange={handleInputChange}
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                            placeholder="+263 77 123 4567"
+                        />
+                    </div>
+
+                    <div className="flex space-x-3 pt-4">
                         <button
                             type="button"
                             onClick={() => setIsCreateModalOpen(false)}
-                            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                            className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 transition-colors"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors"
                         >
                             Create Farm
                         </button>
@@ -373,75 +472,47 @@ const FarmsPage = () => {
                 isOpen={isViewModalOpen}
                 onClose={() => setIsViewModalOpen(false)}
                 title="Farm Details"
-                size="md"
             >
                 {selectedFarm && (
                     <div className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Farm Name
-                                </label>
-                                <p className="text-gray-900 font-medium">{selectedFarm.name}</p>
+                                <label className="block text-sm font-medium text-gray-600">Farm Name</label>
+                                <p className="text-lg font-semibold">{selectedFarm.name}</p>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Location
-                                </label>
-                                <p className="text-gray-900">{selectedFarm.location}</p>
+                                <label className="block text-sm font-medium text-gray-600">Location</label>
+                                <p className="text-lg">{selectedFarm.location}</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600">Size</label>
+                                <p className="text-lg">{selectedFarm.size} hectares</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600">Soil Type</label>
+                                <p className="text-lg">{selectedFarm.soilType || 'Not specified'}</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600">Owner</label>
+                                <p className="text-lg">{selectedFarm.ownerName}</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-600">Contact</label>
+                                <p className="text-lg">{selectedFarm.contactNumber || 'Not provided'}</p>
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Size
-                                </label>
-                                <p className="text-gray-900">{selectedFarm.size} hectares</p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Soil Type
-                                </label>
-                                <p className="text-gray-900">{selectedFarm.soilType || 'Not specified'}</p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Owner
-                                </label>
-                                <p className="text-gray-900">{selectedFarm.ownerName}</p>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-600 mb-1">
-                                    Contact
-                                </label>
-                                <p className="text-gray-900">{selectedFarm.contactNumber || 'Not provided'}</p>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">
-                                Created Date
-                            </label>
-                            <p className="text-gray-900">
-                                {selectedFarm.createdAt ? new Date(selectedFarm.createdAt).toLocaleDateString() : 'Unknown'}
-                            </p>
+                        <div className="pt-4 border-t">
+                            <button
+                                onClick={() => setIsViewModalOpen(false)}
+                                className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                                Close
+                            </button>
                         </div>
                     </div>
                 )}
             </Modal>
-
-            {/* Error Notice */}
-            {error && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                    <p className="text-yellow-800 text-sm">
-                        Unable to load farms from server. Showing sample data instead.
-                    </p>
-                </div>
-            )}
         </div>
     );
 };

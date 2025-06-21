@@ -111,7 +111,7 @@ const Layout = () => {
                             <div className="bg-green-600 p-2 rounded-lg">
                                 <Sprout className="w-6 h-6 text-white" />
                             </div>
-                            <span className="text-xl font-bold text-gray-900">Maize Admin</span>
+                            <span className="text-xl font-bold text-gray-900">HarvestIQ</span>
                         </div>
 
                         {/* Close button for mobile */}
