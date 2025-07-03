@@ -21,6 +21,8 @@ import PlantingSessionsPage from "./pages/PlantingSessionsPage";
 import FarmsPage from "./pages/FarmsPage";
 import ModelsPage from "./pages/ModelsPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
+import FarmsDetailPage from "./pages/FarmsDetailPage";
+
 
 // Import placeholder page for missing routes
 import PlaceholderPage from './pages/PlaceholderPage';
@@ -44,6 +46,7 @@ function App() {
                 {/* Dashboard - accessible to all authenticated users */}
                 <Route index element={<Navigate to="/dashboard" replace />} />
                 <Route path="dashboard" element={<DashboardPage />} />
+                <Route path="/farms/:farmId" element={<FarmsDetailPage />}/>
 
                 {/* Admin Only Routes */}
                 <Route path="users" element={

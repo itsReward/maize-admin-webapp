@@ -1,5 +1,6 @@
 // src/pages/FarmsPage.jsx
 import React, { useState, useMemo} from 'react';
+import {useNavigate} from 'react-router-dom';
 import { Plus, MapPin, User, Edit, Trash2, Eye, Mail, Phone } from 'lucide-react';
 import apiService from '../services/apiService';
 import { useApi } from '../hooks/useApi';
@@ -7,6 +8,7 @@ import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
 
 const FarmsPage = () => {
+    const navigate = useNavigate();
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [selectedFarm, setSelectedFarm] = useState(null);
     const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -124,8 +126,9 @@ const FarmsPage = () => {
     };
 
     const handleViewFarm = (farm) => {
-        setSelectedFarm(farm);
-        setIsViewModalOpen(true);
+        console.log('🔍 Viewing farm details:', farm);
+        // Navigate to the farm detail page
+        navigate(`/farms/${farm.id}`);
     };
 
     const handleDeleteFarm = async (farmId) => {
