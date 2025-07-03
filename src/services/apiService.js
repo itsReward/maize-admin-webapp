@@ -275,7 +275,7 @@ class ApiService {
     }
 
     // User APIs
-    async getUsers(page = 0, size = 10, search = '') {
+    async getUsers(page = 0, size = 50, search = '') {
         const params = new URLSearchParams({ page, size, search });
         return this.get(`/users?${params}`);
     }
