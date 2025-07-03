@@ -1,6 +1,6 @@
 // src/pages/FarmsPage.jsx
 import React, { useState, useMemo} from 'react';
-import { Plus, MapPin, User, Calendar, Edit, Trash2, Eye } from 'lucide-react';
+import { Plus, MapPin, User, Edit, Trash2, Eye, Mail, Phone } from 'lucide-react';
 import apiService from '../services/apiService';
 import { useApi } from '../hooks/useApi';
 import DataTable from '../components/common/DataTable';
@@ -140,6 +140,12 @@ const FarmsPage = () => {
         }
     };
 
+    const handleEditFarm = (farmId) => {
+        console.log('Edit farm:', farmId);
+        // TODO: Navigate to edit page or open edit modal
+        // Example: navigate(`/farms/${farmId}/edit`);
+    };
+
     // Safe calculation helpers
     const getTotalFarms = () => {
         return Array.isArray(farmData) ? farmData.length : 0;
@@ -165,53 +171,71 @@ const FarmsPage = () => {
         {
             key: 'name',
             label: 'Farm Name',
-            render: (value) => value || 'N/A'
+            render: (value, farm) => (
+                <div>
+                    <p className="font-medium text-gray-900">{value}</p>
+                    <p className="text-sm text-gray-500">ID: {farm.id}</p>
+                </div>
+            )
         },
         {
             key: 'location',
             label: 'Location',
             render: (value) => (
                 <div className="flex items-center">
-                    <MapPin className="w-4 h-4 text-gray-400 mr-2" />
-                    {value || 'N/A'}
+                    <MapPin className="w-4 h-4 text-gray-400 mr-1" />
+                    <span>{value}</span>
                 </div>
             )
         },
         {
             key: 'sizeHectares',
-            label: 'Size (hectares)',
-            render: (value) => value ? `${parseFloat(value).toFixed(1)} ha` : 'N/A'
+            label: 'Size (Hectares)',
+            render: (value) => `${value} ha`
         },
-        /*{
-            key: 'soilType',
-            label: 'Soil Type',
-            render: (value) => value || 'N/A'
-        },*/
         {
-            key: 'ownerId',
+            key: 'ownerName',
             label: 'Owner',
-            render: (ownerId, farm) => {
-                // If we have a direct ownerName on the farm, use it
-                if (farm.ownerName) return farm.ownerName;
-
-                // Otherwise, try to find the owner in our extracted owners list
-                const owner = getOwnerDetailsById(ownerId);
-                return owner.name;
-            }
-
+            render: (value, farm) => (
+                <div>
+                    <p className="font-medium text-gray-900">{value || 'Unknown Owner'}</p>
+                    <p className="text-xs text-gray-500">ID: {farm.ownerId}</p>
+                </div>
+            )
         },
         {
-            key: 'ownerId',
+            key: 'contact',
             label: 'Contact',
-            render: (ownerId, farm) => {
-                // If we have a direct contactNumber on the farm, use it
-                if (farm.contactNumber) return farm.contactNumber;
-
-                // Otherwise, try to find the owner in our extracted owners list
-                const owner = getOwnerDetailsById(ownerId);
-                return owner.phone;
-            }
-
+            render: (_, farm) => (
+                <div className="space-y-1">
+                    {farm.ownerEmail ? (
+                        <div className="flex items-center text-sm text-gray-600">
+                            <Mail className="w-3 h-3 mr-1" />
+                            <a
+                                href={`mailto:${farm.ownerEmail}`}
+                                className="hover:text-blue-600 truncate max-w-32"
+                                title={farm.ownerEmail}
+                            >
+                                {farm.ownerEmail}
+                            </a>
+                        </div>
+                    ) : null}
+                    {farm.ownerPhone ? (
+                        <div className="flex items-center text-sm text-gray-600">
+                            <Phone className="w-3 h-3 mr-1" />
+                            <a
+                                href={`tel:${farm.ownerPhone}`}
+                                className="hover:text-blue-600"
+                            >
+                                {farm.ownerPhone}
+                            </a>
+                        </div>
+                    ) : null}
+                    {!farm.ownerEmail && !farm.ownerPhone && (
+                        <span className="text-sm text-gray-400">No contact info</span>
+                    )}
+                </div>
+            )
         },
         {
             key: 'actions',
@@ -219,22 +243,22 @@ const FarmsPage = () => {
             render: (_, farm) => (
                 <div className="flex space-x-2">
                     <button
-                        onClick={() => handleViewFarm(farm)}
-                        className="text-blue-600 hover:text-blue-800 transition-colors"
+                        onClick={() => handleViewFarm(farm.id)}
+                        className="text-blue-600 hover:text-blue-900"
                         title="View Details"
                     >
                         <Eye className="w-4 h-4" />
                     </button>
                     <button
-                        onClick={() => console.log('Edit farm:', farm.id)}
-                        className="text-green-600 hover:text-green-800 transition-colors"
+                        onClick={() => handleEditFarm(farm.id)}
+                        className="text-green-600 hover:text-green-900"
                         title="Edit Farm"
                     >
                         <Edit className="w-4 h-4" />
                     </button>
                     <button
                         onClick={() => handleDeleteFarm(farm.id)}
-                        className="text-red-600 hover:text-red-800 transition-colors"
+                        className="text-red-600 hover:text-red-900"
                         title="Delete Farm"
                     >
                         <Trash2 className="w-4 h-4" />
