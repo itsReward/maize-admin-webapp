@@ -1,122 +1,323 @@
+// src/pages/FarmsDetailPage.jsx - Updated with Real API Integration
 import React, { useState, useEffect } from 'react';
-import { MapPin, Thermometer, Droplets, Wind, Eye, Sun, ArrowLeft, Activity, TestTube, Sprout, Calendar, TrendingUp, AlertTriangle } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+    ArrowLeft,
+    MapPin,
+    Calendar,
+    TestTube,
+    Sprout,
+    TrendingUp,
+    Thermometer,
+    Droplets,
+    Wind,
+    Phone,
+    User,
+    FileText,
+    Activity,
+    AlertTriangle
+} from 'lucide-react';
+import apiService from '../services/apiService';
+import { useApi } from '../hooks/useApi';
+import LoadingSpinner from '../components/common/LoadingSpinner';
+import ErrorMessage from '../components/common/ErrorMessage';
 
-// Mock API service - you can replace this with your actual apiService
-const apiService = {
-    async getFarmById(farmId) {
-        // Simulate API call
-        return new Promise(resolve => {
-            setTimeout(() => {
-                resolve({
-                    id: farmId,
-                    name: "Green Valley Farm",
-                    location: "Harare, Zimbabwe",
-                    sizeHectares: 12.5,
-                    latitude: -17.8252,
-                    longitude: 31.0335,
-                    elevation: 1483,
-                    createdAt: "2024-03-15T10:30:00Z",
-                    ownerName: "John Mukamuri",
-                    contactNumber: "+263 77 123 4567",
-                    soilData: {
-                        id: 1,
-                        farmId: farmId,
-                        soilType: "Clay Loam",
-                        phLevel: 6.5,
-                        organicMatterPercentage: 3.2,
-                        nitrogenContent: 45,
-                        phosphorusContent: 28,
-                        potassiumContent: 180,
-                        moistureContent: 65,
-                        sampleDate: "2024-06-15T08:00:00Z",
-                        soilHealthScore: 85,
-                        fertilizerRecommendation: "Apply 150kg/ha NPK fertilizer before planting season"
-                    },
-                    activePlantingSessions: [
-                        {
-                            id: 1,
-                            variety: "ZM 523",
-                            plantingDate: "2024-10-15",
-                            growthStage: "Tasseling & Silking",
-                            daysFromPlanting: 85,
-                            expectedHarvestDate: "2025-02-15"
-                        }
-                    ]
-                });
-            }, 500);
-        });
-    },
+// Map Component placeholder
+const MapComponent = ({ latitude, longitude, farmName }) => (
+    <div className="h-64 bg-gradient-to-br from-green-100 to-blue-100 rounded-lg flex items-center justify-center">
+        <div className="text-center">
+            <MapPin className="h-8 w-8 text-green-600 mx-auto mb-2" />
+            <p className="text-gray-600 font-medium">{farmName} Location</p>
+            {latitude && longitude ? (
+                <p className="text-sm text-gray-500">
+                    {latitude.toFixed(4)}, {longitude.toFixed(4)}
+                </p>
+            ) : (
+                <p className="text-sm text-gray-500">Coordinates not available</p>
+            )}
+        </div>
+    </div>
+);
 
-    async getWeatherData(location) {
-        // Simulate weather API call
-        return new Promise(resolve => {
-            setTimeout(() => {
-                resolve({
-                    location: location,
-                    temperature: 28,
-                    humidity: 62,
-                    rainfall: 0,
-                    windSpeed: 8,
-                    pressure: 1015,
-                    visibility: 12,
-                    uvIndex: 7,
-                    conditions: 'Partly Cloudy',
-                    forecast: 'Scattered clouds with possible afternoon showers',
-                    timestamp: new Date().toISOString()
-                });
-            }, 300);
-        });
-    }
-};
-
-const FarmDetailPage = ({ farmId = 1, onBack = () => console.log('Back clicked') }) => {
-    const [farm, setFarm] = useState(null);
-    const [weather, setWeather] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('overview');
-
-    useEffect(() => {
-        const loadFarmData = async () => {
-            try {
-                setLoading(true);
-                const [farmData, weatherData] = await Promise.all([
-                    apiService.getFarmById(farmId),
-                    apiService.getWeatherData("Harare, Zimbabwe")
-                ]);
-                setFarm(farmData);
-                setWeather(weatherData);
-            } catch (error) {
-                console.error('Failed to load farm data:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        if (farmId) {
-            loadFarmData();
-        }
-    }, [farmId]);
-
-    if (loading) {
+// Soil Data Card Component
+const SoilDataCard = ({ soilData }) => {
+    if (!soilData) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading farm details...</p>
-                </div>
+            <div className="text-center py-12">
+                <TestTube className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">No soil data available</p>
+                <p className="text-sm text-gray-400 mt-2">Soil analysis results will appear here once available</p>
             </div>
         );
     }
 
+    return (
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Soil Type */}
+                <div className="bg-gray-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-gray-700 mb-2">Soil Type</h4>
+                    <p className="text-lg font-semibold">{soilData.soilType || 'Not specified'}</p>
+                </div>
+
+                {/* pH Level */}
+                {soilData.phLevel && (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-gray-700 mb-2">pH Level</h4>
+                        <p className="text-lg font-semibold">{soilData.phLevel}</p>
+                    </div>
+                )}
+
+                {/* Organic Matter */}
+                {soilData.organicMatterPercentage && (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-gray-700 mb-2">Organic Matter</h4>
+                        <p className="text-lg font-semibold">{soilData.organicMatterPercentage}%</p>
+                    </div>
+                )}
+
+                {/* Nitrogen Content */}
+                {soilData.nitrogenContent && (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-gray-700 mb-2">Nitrogen (N)</h4>
+                        <p className="text-lg font-semibold">{soilData.nitrogenContent}%</p>
+                    </div>
+                )}
+
+                {/* Phosphorus Content */}
+                {soilData.phosphorusContent && (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-gray-700 mb-2">Phosphorus (P)</h4>
+                        <p className="text-lg font-semibold">{soilData.phosphorusContent}%</p>
+                    </div>
+                )}
+
+                {/* Potassium Content */}
+                {soilData.potassiumContent && (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-gray-700 mb-2">Potassium (K)</h4>
+                        <p className="text-lg font-semibold">{soilData.potassiumContent}%</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Additional soil info */}
+            {soilData.soilHealthScore && (
+                <div className="bg-gradient-to-r from-green-50 to-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-gray-700 mb-2">Soil Health Score</h4>
+                    <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-gray-200 rounded-full h-2">
+                            <div
+                                className="h-2 rounded-full bg-gradient-to-r from-green-400 to-green-600"
+                                style={{ width: `${soilData.soilHealthScore}%` }}
+                            ></div>
+                        </div>
+                        <span className="font-semibold">{soilData.soilHealthScore}/100</span>
+                    </div>
+                </div>
+            )}
+
+            {/* Fertilizer Recommendation */}
+            {soilData.fertilizerRecommendation && (
+                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                    <h4 className="font-medium text-yellow-800 mb-2 flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        Fertilizer Recommendation
+                    </h4>
+                    <p className="text-yellow-700">{soilData.fertilizerRecommendation}</p>
+                </div>
+            )}
+
+            {/* Sample Date */}
+            {soilData.sampleDate && (
+                <div className="text-sm text-gray-500">
+                    <span>Sample taken on: {new Date(soilData.sampleDate).toLocaleDateString()}</span>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Active Planting Sessions Card Component
+const ActiveSessionsCard = ({ sessions }) => {
+    if (!sessions || sessions.length === 0) {
+        return (
+            <div className="text-center py-12">
+                <Sprout className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">No active planting sessions</p>
+                <p className="text-sm text-gray-400 mt-2">Start a new planting session to track your crops</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            {sessions.map((session, index) => (
+                <div key={session.id || index} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-3">
+                        <div>
+                            <h4 className="font-semibold text-lg">
+                                {session.maizeVariety?.name || session.cropVariety || 'Unknown Variety'}
+                            </h4>
+                            <p className="text-sm text-gray-500">
+                                Planted on {new Date(session.plantingDate).toLocaleDateString()}
+                            </p>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            session.growthStage === 'HARVESTED' ? 'bg-blue-100 text-blue-800' :
+                                session.growthStage === 'GROWING' ? 'bg-green-100 text-green-800' :
+                                    session.growthStage === 'PLANTED' ? 'bg-yellow-100 text-yellow-800' :
+                                        'bg-gray-100 text-gray-800'
+                        }`}>
+                            {session.growthStage || 'PLANTED'}
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        {session.daysFromPlanting && (
+                            <div>
+                                <span className="text-gray-500">Days from planting:</span>
+                                <p className="font-medium">{session.daysFromPlanting}</p>
+                            </div>
+                        )}
+
+                        {session.expectedHarvestDate && (
+                            <div>
+                                <span className="text-gray-500">Expected harvest:</span>
+                                <p className="font-medium">
+                                    {new Date(session.expectedHarvestDate).toLocaleDateString()}
+                                </p>
+                            </div>
+                        )}
+
+                        {session.seedRateKgPerHectare && (
+                            <div>
+                                <span className="text-gray-500">Seed rate:</span>
+                                <p className="font-medium">{session.seedRateKgPerHectare} kg/ha</p>
+                            </div>
+                        )}
+
+                        {session.fertilizerType && (
+                            <div>
+                                <span className="text-gray-500">Fertilizer:</span>
+                                <p className="font-medium">{session.fertilizerType}</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Latest Prediction */}
+                    {session.latestPrediction && (
+                        <div className="mt-4 bg-green-50 p-3 rounded-lg">
+                            <div className="flex items-center gap-2 mb-2">
+                                <TrendingUp className="h-4 w-4 text-green-600" />
+                                <span className="font-medium text-green-800">Latest Prediction</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <span className="text-green-600">Predicted Yield:</span>
+                                    <p className="font-semibold">{session.latestPrediction.predictedYield} t/ha</p>
+                                </div>
+                                <div>
+                                    <span className="text-green-600">Confidence:</span>
+                                    <p className="font-semibold">{session.latestPrediction.confidence}%</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {session.notes && (
+                        <div className="mt-3 text-sm">
+                            <span className="text-gray-500">Notes:</span>
+                            <p className="text-gray-700 mt-1">{session.notes}</p>
+                        </div>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// Main Farm Detail Page Component
+const FarmsDetailPage = () => {
+    const { farmId } = useParams();
+    const navigate = useNavigate();
+    const [activeTab, setActiveTab] = useState('soil');
+
+    // Debug farmId to see what we're getting
+    console.log('🔍 FarmsDetailPage - farmId from useParams:', farmId);
+    console.log('🔍 FarmsDetailPage - farmId type:', typeof farmId);
+
+    // Validate farmId
+    const validFarmId = farmId && farmId !== 'undefined' ? farmId : null;
+
+    console.log('🔍 FarmsDetailPage - validFarmId:', validFarmId);
+
+    // If no valid farmId, redirect to farms page
+    React.useEffect(() => {
+        if (!validFarmId) {
+            console.warn('⚠️ No valid farmId found, redirecting to farms page');
+            navigate('/farms');
+        }
+    }, [validFarmId, navigate]);
+
+    // Fetch farm details using the API
+    const {
+        data: farm,
+        loading: farmLoading,
+        error: farmError,
+        refetch: refetchFarm
+    } = useApi(
+        () => validFarmId ? apiService.getFarmById(validFarmId) : null,
+        [validFarmId]
+    );
+
+    // Fetch planting sessions for this farm
+    const {
+        data: plantingSessions,
+        loading: sessionsLoading,
+        error: sessionsError
+    } = useApi(
+        () => validFarmId ? apiService.getPlantingSessions(validFarmId) : null,
+        [validFarmId]
+    );
+
+    // Handle back button click
+    const handleBackClick = () => {
+        navigate('/farms');
+    };
+
+    // Handle loading state
+    if (farmLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <LoadingSpinner size="large" />
+            </div>
+        );
+    }
+
+    // Handle error state
+    if (farmError) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <ErrorMessage
+                    message={`Failed to load farm details: ${farmError.message}`}
+                    onRetry={refetchFarm}
+                />
+            </div>
+        );
+    }
+
+    // Handle case where farm is not found
     if (!farm) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="flex items-center justify-center min-h-screen">
                 <div className="text-center">
-                    <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-                    <p className="text-gray-600">Farm not found</p>
+                    <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                    <h2 className="text-xl font-semibold text-gray-900 mb-2">Farm Not Found</h2>
+                    <p className="text-gray-600 mb-4">The farm you're looking for doesn't exist or you don't have access to it.</p>
                     <button
-                        onClick={onBack}
-                        className="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                        onClick={handleBackClick}
+                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
                     >
                         Back to Farms
                     </button>
@@ -125,255 +326,23 @@ const FarmDetailPage = ({ farmId = 1, onBack = () => console.log('Back clicked')
         );
     }
 
-    const MapComponent = () => (
-        <div className="w-full h-64 bg-green-100 rounded-lg relative overflow-hidden">
-            {/* Simple map placeholder with farm location */}
-            <div className="absolute inset-0 bg-gradient-to-br from-green-200 to-green-300">
-                <div className="absolute inset-0 opacity-20">
-                    <svg viewBox="0 0 100 100" className="w-full h-full">
-                        <path d="M20,40 Q40,20 60,40 T80,60 L80,80 L20,80 Z" fill="currentColor" />
-                    </svg>
-                </div>
-
-                {/* Farm marker */}
-                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                    <div className="relative">
-                        <div className="w-6 h-6 bg-red-500 rounded-full border-2 border-white shadow-lg animate-pulse"></div>
-                        <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-white px-2 py-1 rounded shadow-lg text-xs font-medium whitespace-nowrap">
-                            {farm.name}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Coordinates display */}
-                <div className="absolute bottom-2 left-2 bg-white bg-opacity-90 px-2 py-1 rounded text-xs">
-                    {farm.latitude?.toFixed(4)}°N, {farm.longitude?.toFixed(4)}°E
-                </div>
-            </div>
-        </div>
-    );
-
-    const WeatherCard = () => (
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Current Weather</h3>
-                <Sun className="h-6 w-6" />
-            </div>
-
-            {weather ? (
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-3xl font-bold">{weather.temperature}°C</p>
-                            <p className="text-blue-100">{weather.conditions}</p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-sm text-blue-100">Feels like</p>
-                            <p className="text-xl">{weather.temperature + 2}°C</p>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-blue-400">
-                        <div className="flex items-center gap-2">
-                            <Droplets className="h-4 w-4" />
-                            <div>
-                                <p className="text-xs text-blue-100">Humidity</p>
-                                <p className="font-semibold">{weather.humidity}%</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Wind className="h-4 w-4" />
-                            <div>
-                                <p className="text-xs text-blue-100">Wind</p>
-                                <p className="font-semibold">{weather.windSpeed} km/h</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Eye className="h-4 w-4" />
-                            <div>
-                                <p className="text-xs text-blue-100">Visibility</p>
-                                <p className="font-semibold">{weather.visibility} km</p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Thermometer className="h-4 w-4" />
-                            <div>
-                                <p className="text-xs text-blue-100">UV Index</p>
-                                <p className="font-semibold">{weather.uvIndex}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="mt-4 p-3 bg-blue-400 bg-opacity-30 rounded-lg">
-                        <p className="text-sm">{weather.forecast}</p>
-                    </div>
-                </div>
-            ) : (
-                <div className="text-center">
-                    <div className="animate-pulse">
-                        <div className="h-8 bg-blue-400 rounded w-20 mx-auto mb-2"></div>
-                        <div className="h-4 bg-blue-400 rounded w-24 mx-auto"></div>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-
-    const SoilDataCard = () => (
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-            <div className="flex items-center gap-2 mb-4">
-                <TestTube className="h-5 w-5 text-amber-600" />
-                <h3 className="text-lg font-semibold">Soil Analysis</h3>
-            </div>
-
-            {farm.soilData ? (
-                <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <p className="text-sm text-gray-500">Soil Type</p>
-                            <p className="font-semibold text-gray-900">{farm.soilData.soilType}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500">pH Level</p>
-                            <p className="font-semibold text-gray-900">{farm.soilData.phLevel}</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500">Organic Matter</p>
-                            <p className="font-semibold text-gray-900">{farm.soilData.organicMatterPercentage}%</p>
-                        </div>
-                        <div>
-                            <p className="text-sm text-gray-500">Moisture</p>
-                            <p className="font-semibold text-gray-900">{farm.soilData.moistureContent}%</p>
-                        </div>
-                    </div>
-
-                    <div className="pt-4 border-t">
-                        <div className="flex items-center justify-between mb-2">
-                            <p className="text-sm text-gray-500">Soil Health Score</p>
-                            <p className="font-semibold text-green-600">{farm.soilData.soilHealthScore}/100</p>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                                className="bg-green-500 h-2 rounded-full"
-                                style={{ width: `${farm.soilData.soilHealthScore}%` }}
-                            ></div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-3">
-                        <h4 className="font-medium text-gray-900">Nutrient Content</h4>
-                        <div className="grid grid-cols-3 gap-3">
-                            <div className="text-center p-3 bg-blue-50 rounded-lg">
-                                <p className="text-xs text-gray-500">Nitrogen (N)</p>
-                                <p className="font-semibold text-blue-600">{farm.soilData.nitrogenContent}mg/kg</p>
-                            </div>
-                            <div className="text-center p-3 bg-purple-50 rounded-lg">
-                                <p className="text-xs text-gray-500">Phosphorus (P)</p>
-                                <p className="font-semibold text-purple-600">{farm.soilData.phosphorusContent}mg/kg</p>
-                            </div>
-                            <div className="text-center p-3 bg-orange-50 rounded-lg">
-                                <p className="text-xs text-gray-500">Potassium (K)</p>
-                                <p className="font-semibold text-orange-600">{farm.soilData.potassiumContent}mg/kg</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {farm.soilData.fertilizerRecommendation && (
-                        <div className="mt-4 p-4 bg-green-50 rounded-lg">
-                            <h4 className="font-medium text-green-800 mb-2">Recommendation</h4>
-                            <p className="text-sm text-green-700">{farm.soilData.fertilizerRecommendation}</p>
-                        </div>
-                    )}
-                </div>
-            ) : (
-                <div className="text-center py-8">
-                    <TestTube className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                    <p className="text-gray-500">No soil data available</p>
-                    <button className="mt-2 text-green-600 hover:text-green-700 text-sm font-medium">
-                        Schedule Soil Test
-                    </button>
-                </div>
-            )}
-        </div>
-    );
-
-    const ActiveSessionsCard = () => (
-        <div className="bg-white rounded-xl p-6 shadow-sm border">
-            <div className="flex items-center gap-2 mb-4">
-                <Sprout className="h-5 w-5 text-green-600" />
-                <h3 className="text-lg font-semibold">Active Planting Sessions</h3>
-            </div>
-
-            {farm.activePlantingSessions && farm.activePlantingSessions.length > 0 ? (
-                <div className="space-y-4">
-                    {farm.activePlantingSessions.map((session, index) => (
-                        <div key={session.id || index} className="border rounded-lg p-4">
-                            <div className="flex justify-between items-start mb-3">
-                                <div>
-                                    <h4 className="font-semibold text-gray-900">{session.variety}</h4>
-                                    <p className="text-sm text-gray-500">Planted on {new Date(session.plantingDate).toLocaleDateString()}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-sm text-gray-500">Days from planting</p>
-                                    <p className="font-semibold text-green-600">{session.daysFromPlanting}</p>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <p className="text-xs text-gray-500">Growth Stage</p>
-                                    <p className="font-medium text-gray-900">{session.growthStage}</p>
-                                </div>
-                                <div>
-                                    <p className="text-xs text-gray-500">Expected Harvest</p>
-                                    <p className="font-medium text-gray-900">
-                                        {new Date(session.expectedHarvestDate).toLocaleDateString()}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="mt-3">
-                                <div className="flex justify-between text-xs text-gray-500 mb-1">
-                                    <span>Progress</span>
-                                    <span>{Math.round((session.daysFromPlanting / 120) * 100)}%</span>
-                                </div>
-                                <div className="w-full bg-gray-200 rounded-full h-2">
-                                    <div
-                                        className="bg-green-500 h-2 rounded-full"
-                                        style={{ width: `${Math.min((session.daysFromPlanting / 120) * 100, 100)}%` }}
-                                    ></div>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <div className="text-center py-8">
-                    <Sprout className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                    <p className="text-gray-500">No active planting sessions</p>
-                    <button className="mt-2 text-green-600 hover:text-green-700 text-sm font-medium">
-                        Start New Session
-                    </button>
-                </div>
-            )}
-        </div>
-    );
-
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
-            <div className="bg-white shadow-sm border-b">
+            <div className="bg-white border-b">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
+                    <div className="flex items-center justify-between py-6">
+                        {/* Back Button and Farm Info */}
                         <div className="flex items-center gap-4">
                             <button
-                                onClick={onBack}
-                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                onClick={handleBackClick}
+                                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors"
                             >
                                 <ArrowLeft className="h-5 w-5" />
+                                <span className="font-medium">Back to Farms</span>
                             </button>
-                            <div>
-                                <h1 className="text-xl font-bold text-gray-900">{farm.name}</h1>
+                            <div className="border-l border-gray-300 pl-4">
+                                <h1 className="text-2xl font-bold text-gray-900">{farm.name}</h1>
                                 <p className="text-sm text-gray-500 flex items-center gap-1">
                                     <MapPin className="h-3 w-3" />
                                     {farm.location}
@@ -399,28 +368,31 @@ const FarmDetailPage = ({ farmId = 1, onBack = () => console.log('Back clicked')
                         <h3 className="text-lg font-semibold mb-4">Farm Information</h3>
                         <div className="space-y-3">
                             <div className="flex justify-between">
-                                <span className="text-gray-500">Owner:</span>
-                                <span className="font-medium">{farm.ownerName}</span>
+                                <span className="text-gray-500">Size:</span>
+                                <span className="font-medium">{farm.sizeHectares} hectares</span>
                             </div>
-                            <div className="flex justify-between">
-                                <span className="text-gray-500">Contact:</span>
-                                <span className="font-medium">{farm.contactNumber}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-gray-500">Elevation:</span>
-                                <span className="font-medium">{farm.elevation}m</span>
-                            </div>
+                            {farm.elevation && (
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500">Elevation:</span>
+                                    <span className="font-medium">{farm.elevation}m</span>
+                                </div>
+                            )}
                             <div className="flex justify-between">
                                 <span className="text-gray-500">Created:</span>
                                 <span className="font-medium">
-                  {new Date(farm.createdAt).toLocaleDateString()}
-                </span>
+                                    {new Date(farm.createdAt).toLocaleDateString()}
+                                </span>
                             </div>
+                            {farm.latitude && farm.longitude && (
+                                <div className="flex justify-between">
+                                    <span className="text-gray-500">Coordinates:</span>
+                                    <span className="font-medium text-xs">
+                                        {farm.latitude.toFixed(4)}, {farm.longitude.toFixed(4)}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     </div>
-
-                    {/* Weather Card */}
-                    <WeatherCard />
 
                     {/* Quick Stats Card */}
                     <div className="bg-white rounded-xl p-6 shadow-sm border">
@@ -428,11 +400,13 @@ const FarmDetailPage = ({ farmId = 1, onBack = () => console.log('Back clicked')
                         <div className="space-y-4">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-green-100 rounded-lg">
-                                    <Activity className="h-5 w-5 text-green-600" />
+                                    <Sprout className="h-5 w-5 text-green-600" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-500">Active Sessions</p>
-                                    <p className="font-semibold">{farm.activePlantingSessions?.length || 0}</p>
+                                    <p className="font-semibold">
+                                        {farm.activePlantingSessions?.length || 0}
+                                    </p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
@@ -441,7 +415,12 @@ const FarmDetailPage = ({ farmId = 1, onBack = () => console.log('Back clicked')
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-500">Soil Health</p>
-                                    <p className="font-semibold">{farm.soilData?.soilHealthScore || 'N/A'}/100</p>
+                                    <p className="font-semibold">
+                                        {farm.soilData?.soilHealthScore ?
+                                            `${farm.soilData.soilHealthScore}/100` :
+                                            'Not tested'
+                                        }
+                                    </p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
@@ -449,9 +428,30 @@ const FarmDetailPage = ({ farmId = 1, onBack = () => console.log('Back clicked')
                                     <TrendingUp className="h-5 w-5 text-purple-600" />
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-500">Productivity</p>
-                                    <p className="font-semibold">Good</p>
+                                    <p className="text-sm text-gray-500">Status</p>
+                                    <p className="font-semibold">
+                                        {farm.activePlantingSessions?.length > 0 ? 'Active' : 'Inactive'}
+                                    </p>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Farm Overview */}
+                    <div className="bg-white rounded-xl p-6 shadow-sm border">
+                        <h3 className="text-lg font-semibold mb-4">Farm Overview</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <p className="text-sm text-gray-500">Location</p>
+                                <p className="font-medium">{farm.location}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-500">Total Area</p>
+                                <p className="font-medium">{farm.sizeHectares} hectares</p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-500">Farm ID</p>
+                                <p className="font-medium">#{farm.id}</p>
                             </div>
                         </div>
                     </div>
@@ -460,7 +460,11 @@ const FarmDetailPage = ({ farmId = 1, onBack = () => console.log('Back clicked')
                 {/* Map Section */}
                 <div className="bg-white rounded-xl p-6 shadow-sm border mb-8">
                     <h3 className="text-lg font-semibold mb-4">Farm Location</h3>
-                    <MapComponent />
+                    <MapComponent
+                        latitude={farm.latitude}
+                        longitude={farm.longitude}
+                        farmName={farm.name}
+                    />
                 </div>
 
                 {/* Detailed Information Tabs */}
@@ -489,12 +493,21 @@ const FarmDetailPage = ({ farmId = 1, onBack = () => console.log('Back clicked')
                     </div>
 
                     <div className="p-6">
-                        {activeTab === 'soil' && <SoilDataCard />}
-                        {activeTab === 'sessions' && <ActiveSessionsCard />}
+                        {activeTab === 'soil' && (
+                            <SoilDataCard soilData={farm.soilData} />
+                        )}
+                        {activeTab === 'sessions' && (
+                            <ActiveSessionsCard
+                                sessions={farm.activePlantingSessions || plantingSessions}
+                            />
+                        )}
                         {activeTab === 'history' && (
                             <div className="text-center py-12">
                                 <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                                 <p className="text-gray-500">Farm history coming soon</p>
+                                <p className="text-sm text-gray-400 mt-2">
+                                    Historical data and analytics will be available here
+                                </p>
                             </div>
                         )}
                     </div>
@@ -504,4 +517,4 @@ const FarmDetailPage = ({ farmId = 1, onBack = () => console.log('Back clicked')
     );
 };
 
-export default FarmDetailPage;
+export default FarmsDetailPage;

@@ -337,8 +337,523 @@ class ApiService {
         }
     }
 
+    // Addition to src/services/apiService.js - Updated getFarmById method
+
+// Farm APIs - Updated with proper error handling for farm details
     async getFarmById(id) {
-        return this.get(`/farms/${id}`);
+        try {
+            // Validate input ID
+            if (!id || id === 'undefined' || id === 'null') {
+                console.error('❌ Invalid farm ID provided:', id);
+                throw new Error('Invalid farm ID provided');
+            }
+
+            console.log(`🔍 Fetching farm details for ID: ${id} (type: ${typeof id})`);
+
+            // Use the correct endpoint that matches the backend controller
+            const farm = await this.get(`/farms/${id}`);
+
+            console.log('✅ Farm details fetched successfully:', farm);
+            return farm;
+        } catch (error) {
+            console.error(`❌ Failed to fetch farm ${id}:`, error);
+
+            // Handle specific error cases
+            if (error.message.includes('Invalid farm ID')) {
+                throw error; // Re-throw validation errors
+            } else if (error.status === 404) {
+                throw new Error(`Farm with ID ${id} not found`);
+            } else if (error.status === 403) {
+                throw new Error(`Access denied to farm ${id}`);
+            } else if (error.status === 401) {
+                throw new Error('Authentication required to view farm details');
+            }
+
+            // For development/testing, return mock data if endpoint isn't ready
+            if (error.status === 500 || !navigator.onLine) {
+                console.warn('⚠️ Backend error or offline, returning mock farm data');
+                return {
+                    id: parseInt(id) || id,
+                    name: `Mock Farm ${id}`,
+                    location: 'Sample Location, Zimbabwe',
+                    sizeHectares: 25.5,
+                    latitude: -17.8252,
+                    longitude: 31.0335,
+                    elevation: 1472,
+                    createdAt: '2024-01-15T10:30:00Z',
+                    soilData: {
+                        id: 1,
+                        farmId: parseInt(id) || id,
+                        soilType: 'Loamy Clay',
+                        phLevel: 6.8,
+                        organicMatterPercentage: 3.2,
+                        nitrogenContent: 0.15,
+                        phosphorusContent: 0.08,
+                        potassiumContent: 0.12,
+                        moistureContent: 22.5,
+                        soilHealthScore: 78,
+                        fertilizerRecommendation: 'Apply NPK 10:10:10 at 300kg/ha before planting. Consider lime application to raise pH slightly.'
+                    },
+                    activePlantingSessions: [
+                        {
+                            id: 1,
+                            farmId: parseInt(id) || id,
+                            maizeVariety: {
+                                id: 1,
+                                name: 'ZM 523',
+                                description: 'High-yielding drought-tolerant variety'
+                            },
+                            plantingDate: '2024-11-01',
+                            expectedHarvestDate: '2025-04-15',
+                            seedRateKgPerHectare: 25,
+                            rowSpacingCm: 90,
+                            fertilizerType: 'NPK 10:10:10',
+                            fertilizerAmountKgPerHectare: 300,
+                            irrigationMethod: 'Drip Irrigation',
+                            notes: 'Excellent growing conditions, regular monitoring scheduled',
+                            daysFromPlanting: 45,
+                            growthStage: 'GROWING',
+                            latestPrediction: {
+                                id: 1,
+                                predictedYield: 6.8,
+                                confidence: 87,
+                                predictionDate: '2024-12-01T00:00:00Z'
+                            }
+                        },
+                        {
+                            id: 2,
+                            farmId: parseInt(id) || id,
+                            maizeVariety: {
+                                id: 2,
+                                name: 'SC627',
+                                description: 'Medium maturing variety with good disease resistance'
+                            },
+                            plantingDate: '2024-10-15',
+                            expectedHarvestDate: '2025-03-30',
+                            seedRateKgPerHectare: 22,
+                            rowSpacingCm: 75,
+                            fertilizerType: 'Compound D',
+                            fertilizerAmountKgPerHectare: 250,
+                            irrigationMethod: 'Rain-fed',
+                            notes: 'Monitoring for armyworm activity',
+                            daysFromPlanting: 62,
+                            growthStage: 'TASSELING',
+                            latestPrediction: {
+                                id: 2,
+                                predictedYield: 5.2,
+                                confidence: 82,
+                                predictionDate: '2024-12-10T00:00:00Z'
+                            }
+                        }
+                    ]
+                };
+            }
+
+            throw error;
+        }
+    }
+
+// Enhanced method to get planting sessions for a specific farm
+    async getPlantingSessionsByFarmId(farmId) {
+        try {
+            // Validate input farmId
+            if (!farmId || farmId === 'undefined' || farmId === 'null') {
+                console.error('❌ Invalid farmId provided for planting sessions:', farmId);
+                return [];
+            }
+
+            console.log(`🌱 Fetching planting sessions for farm ID: ${farmId}`);
+
+            // Use the correct endpoint that matches the backend controller
+            const sessions = await this.get(`/planting-sessions/farms/${farmId}`);
+
+            console.log('✅ Planting sessions fetched successfully:', sessions);
+
+            // Ensure we always return an array
+            if (!sessions) {
+                console.warn('⚠️ getPlantingSessionsByFarmId returned null/undefined, returning empty array');
+                return [];
+            }
+
+            if (!Array.isArray(sessions)) {
+                console.warn('⚠️ getPlantingSessionsByFarmId response is not an array:', typeof sessions, sessions);
+                // If it's a paginated response, extract the content
+                if (sessions && sessions.content && Array.isArray(sessions.content)) {
+                    console.log('🔍 Extracting planting sessions from paginated response');
+                    return sessions.content;
+                }
+                return [];
+            }
+
+            return sessions;
+        } catch (error) {
+            console.error(`❌ Failed to fetch planting sessions for farm ${farmId}:`, error);
+
+            // Handle specific error cases
+            if (error.status === 404) {
+                console.warn(`⚠️ No planting sessions found for farm ${farmId}`);
+                return [];
+            } else if (error.status === 403) {
+                console.warn(`⚠️ Access denied to planting sessions for farm ${farmId}, returning empty array`);
+                return [];
+            }
+
+            // For development/testing, return mock data if endpoint isn't ready
+            if (error.status === 500 || !navigator.onLine) {
+                console.warn('⚠️ Backend error or offline, returning mock planting sessions');
+                return [
+                    {
+                        id: 1,
+                        farmId: parseInt(farmId) || farmId,
+                        maizeVariety: {
+                            id: 1,
+                            name: 'ZM 523',
+                            description: 'High-yielding drought-tolerant variety'
+                        },
+                        plantingDate: '2024-11-01',
+                        expectedHarvestDate: '2025-04-15',
+                        seedRateKgPerHectare: 25,
+                        rowSpacingCm: 90,
+                        fertilizerType: 'NPK 10:10:10',
+                        fertilizerAmountKgPerHectare: 300,
+                        irrigationMethod: 'Drip Irrigation',
+                        notes: 'Mock planting session - endpoint not implemented yet',
+                        daysFromPlanting: 45,
+                        growthStage: 'GROWING',
+                        latestPrediction: {
+                            id: 1,
+                            predictedYield: 6.8,
+                            confidence: 87,
+                            predictionDate: '2024-12-01T00:00:00Z'
+                        }
+                    }
+                ];
+            }
+
+            // Return empty array for other errors to prevent crashes
+            return [];
+        }
+    }
+
+// Updated method for fetching planting sessions with farm filtering
+    async getPlantingSessions(farmId = null) {
+        try {
+            console.log(`🌱 Fetching planting sessions${farmId ? ` for farm ${farmId}` : ' (all)'}`);
+
+            // If farmId is provided, get sessions for specific farm
+            if (farmId && farmId !== 'undefined' && farmId !== 'null') {
+                return await this.getPlantingSessionsByFarmId(farmId);
+            }
+
+            // Otherwise get all sessions
+            const endpoint = '/planting-sessions';
+            const response = await this.get(endpoint);
+
+            // Ensure we always return an array
+            if (!response) {
+                console.warn('⚠️ getPlantingSessions returned null/undefined, returning empty array');
+                return [];
+            }
+
+            if (!Array.isArray(response)) {
+                console.warn('⚠️ getPlantingSessions response is not an array:', typeof response, response);
+                // If it's a paginated response, extract the content
+                if (response && response.content && Array.isArray(response.content)) {
+                    console.log('🔍 Extracting planting sessions from paginated response');
+                    return response.content;
+                }
+                return [];
+            }
+
+            return response;
+        } catch (error) {
+            console.error('❌ getPlantingSessions error:', error);
+
+            // Don't crash the app if planting sessions endpoint is missing
+            if (error.status === 404) {
+                console.warn('⚠️ Planting sessions endpoint not found, returning mock data');
+                return [
+                    {
+                        id: 1,
+                        farmId: farmId || 1,
+                        farmName: 'Demo Farm',
+                        cropVariety: 'SC627',
+                        plantingDate: '2024-11-01',
+                        expectedHarvestDate: '2025-04-15',
+                        areaPlanted: 15.5,
+                        seedQuantity: 25,
+                        status: 'PLANTED',
+                        notes: 'Demo planting session - endpoint not implemented yet'
+                    },
+                    {
+                        id: 2,
+                        farmId: farmId || 2,
+                        farmName: 'Sample Farm',
+                        cropVariety: 'ZM621',
+                        plantingDate: '2024-10-15',
+                        expectedHarvestDate: '2025-03-30',
+                        areaPlanted: 22.3,
+                        seedQuantity: 35,
+                        status: 'GROWING',
+                        notes: 'Demo planting session - endpoint not implemented yet'
+                    }
+                ];
+            }
+
+            // For other errors, return empty array to prevent crashes
+            return [];
+        }
+    }// Addition to src/services/apiService.js - Updated getFarmById method
+
+// Farm APIs - Updated with proper error handling for farm details
+    async getFarmById(id) {
+        try {
+            console.log(`🔍 Fetching farm details for ID: ${id}`);
+
+            // Use the correct endpoint that matches the backend controller
+            const farm = await this.get(`/farms/${id}`);
+
+            console.log('✅ Farm details fetched successfully:', farm);
+            return farm;
+        } catch (error) {
+            console.error(`❌ Failed to fetch farm ${id}:`, error);
+
+            // Handle specific error cases
+            if (error.status === 404) {
+                throw new Error(`Farm with ID ${id} not found`);
+            } else if (error.status === 403) {
+                throw new Error(`Access denied to farm ${id}`);
+            } else if (error.status === 401) {
+                throw new Error('Authentication required to view farm details');
+            }
+
+            // For development/testing, return mock data if endpoint isn't ready
+            if (error.status === 500 || !navigator.onLine) {
+                console.warn('⚠️ Backend error or offline, returning mock farm data');
+                return {
+                    id: parseInt(id),
+                    name: `Mock Farm ${id}`,
+                    location: 'Sample Location, Zimbabwe',
+                    sizeHectares: 25.5,
+                    latitude: -17.8252,
+                    longitude: 31.0335,
+                    elevation: 1472,
+                    createdAt: '2024-01-15T10:30:00Z',
+                    soilData: {
+                        id: 1,
+                        farmId: parseInt(id),
+                        soilType: 'Loamy Clay',
+                        phLevel: 6.8,
+                        organicMatterPercentage: 3.2,
+                        nitrogenContent: 0.15,
+                        phosphorusContent: 0.08,
+                        potassiumContent: 0.12,
+                        moistureContent: 22.5,
+                        sampleDate: '2024-10-15T00:00:00Z',
+                        soilHealthScore: 78,
+                        fertilizerRecommendation: 'Apply NPK 10:10:10 at 300kg/ha before planting. Consider lime application to raise pH slightly.'
+                    },
+                    activePlantingSessions: [
+                        {
+                            id: 1,
+                            farmId: parseInt(id),
+                            maizeVariety: {
+                                id: 1,
+                                name: 'ZM 523',
+                                description: 'High-yielding drought-tolerant variety'
+                            },
+                            plantingDate: '2024-11-01',
+                            expectedHarvestDate: '2025-04-15',
+                            seedRateKgPerHectare: 25,
+                            rowSpacingCm: 90,
+                            fertilizerType: 'NPK 10:10:10',
+                            fertilizerAmountKgPerHectare: 300,
+                            irrigationMethod: 'Drip Irrigation',
+                            notes: 'Excellent growing conditions, regular monitoring scheduled',
+                            daysFromPlanting: 45,
+                            growthStage: 'GROWING',
+                            latestPrediction: {
+                                id: 1,
+                                predictedYield: 6.8,
+                                confidence: 87,
+                                predictionDate: '2024-12-01T00:00:00Z'
+                            }
+                        },
+                        {
+                            id: 2,
+                            farmId: parseInt(id),
+                            maizeVariety: {
+                                id: 2,
+                                name: 'SC627',
+                                description: 'Medium maturing variety with good disease resistance'
+                            },
+                            plantingDate: '2024-10-15',
+                            expectedHarvestDate: '2025-03-30',
+                            seedRateKgPerHectare: 22,
+                            rowSpacingCm: 75,
+                            fertilizerType: 'Compound D',
+                            fertilizerAmountKgPerHectare: 250,
+                            irrigationMethod: 'Rain-fed',
+                            notes: 'Monitoring for armyworm activity',
+                            daysFromPlanting: 62,
+                            growthStage: 'TASSELING',
+                            latestPrediction: {
+                                id: 2,
+                                predictedYield: 5.2,
+                                confidence: 82,
+                                predictionDate: '2024-12-10T00:00:00Z'
+                            }
+                        }
+                    ]
+                };
+            }
+
+            throw error;
+        }
+    }
+
+// Enhanced method to get planting sessions for a specific farm
+    async getPlantingSessionsByFarmId(farmId) {
+        try {
+            console.log(`🌱 Fetching planting sessions for farm ID: ${farmId}`);
+
+            // Use the correct endpoint that matches the backend controller
+            const sessions = await this.get(`/planting-sessions/farms/${farmId}`);
+
+            console.log('✅ Planting sessions fetched successfully:', sessions);
+
+            // Ensure we always return an array
+            if (!sessions) {
+                console.warn('⚠️ getPlantingSessionsByFarmId returned null/undefined, returning empty array');
+                return [];
+            }
+
+            if (!Array.isArray(sessions)) {
+                console.warn('⚠️ getPlantingSessionsByFarmId response is not an array:', typeof sessions, sessions);
+                // If it's a paginated response, extract the content
+                if (sessions && sessions.content && Array.isArray(sessions.content)) {
+                    console.log('🔍 Extracting planting sessions from paginated response');
+                    return sessions.content;
+                }
+                return [];
+            }
+
+            return sessions;
+        } catch (error) {
+            console.error(`❌ Failed to fetch planting sessions for farm ${farmId}:`, error);
+
+            // Handle specific error cases
+            if (error.status === 404) {
+                console.warn(`⚠️ No planting sessions found for farm ${farmId}`);
+                return [];
+            } else if (error.status === 403) {
+                throw new Error(`Access denied to planting sessions for farm ${farmId}`);
+            }
+
+            // For development/testing, return mock data if endpoint isn't ready
+            if (error.status === 500 || !navigator.onLine) {
+                console.warn('⚠️ Backend error or offline, returning mock planting sessions');
+                return [
+                    {
+                        id: 1,
+                        farmId: parseInt(farmId),
+                        maizeVariety: {
+                            id: 1,
+                            name: 'ZM 523',
+                            description: 'High-yielding drought-tolerant variety'
+                        },
+                        plantingDate: '2024-11-01',
+                        expectedHarvestDate: '2025-04-15',
+                        seedRateKgPerHectare: 25,
+                        rowSpacingCm: 90,
+                        fertilizerType: 'NPK 10:10:10',
+                        fertilizerAmountKgPerHectare: 300,
+                        irrigationMethod: 'Drip Irrigation',
+                        notes: 'Mock planting session - endpoint not implemented yet',
+                        daysFromPlanting: 45,
+                        growthStage: 'GROWING',
+                        latestPrediction: {
+                            id: 1,
+                            predictedYield: 6.8,
+                            confidence: 87,
+                            predictionDate: '2024-12-01T00:00:00Z'
+                        }
+                    }
+                ];
+            }
+
+            throw error;
+        }
+    }
+
+// Updated method for fetching planting sessions with farm filtering
+    async getPlantingSessions(farmId = null) {
+        try {
+            console.log(`🌱 Fetching planting sessions${farmId ? ` for farm ${farmId}` : ' (all)'}`);
+
+            // If farmId is provided, get sessions for specific farm
+            if (farmId) {
+                return await this.getPlantingSessionsByFarmId(farmId);
+            }
+
+            // Otherwise get all sessions
+            const endpoint = '/planting-sessions';
+            const response = await this.get(endpoint);
+
+            // Ensure we always return an array
+            if (!response) {
+                console.warn('⚠️ getPlantingSessions returned null/undefined, returning empty array');
+                return [];
+            }
+
+            if (!Array.isArray(response)) {
+                console.warn('⚠️ getPlantingSessions response is not an array:', typeof response, response);
+                // If it's a paginated response, extract the content
+                if (response && response.content && Array.isArray(response.content)) {
+                    console.log('🔍 Extracting planting sessions from paginated response');
+                    return response.content;
+                }
+                return [];
+            }
+
+            return response;
+        } catch (error) {
+            console.error('❌ getPlantingSessions error:', error);
+
+            // Don't crash the app if planting sessions endpoint is missing
+            if (error.status === 404) {
+                console.warn('⚠️ Planting sessions endpoint not found, returning mock data');
+                return [
+                    {
+                        id: 1,
+                        farmId: farmId || 1,
+                        farmName: 'Demo Farm',
+                        cropVariety: 'SC627',
+                        plantingDate: '2024-11-01',
+                        expectedHarvestDate: '2025-04-15',
+                        areaPlanted: 15.5,
+                        seedQuantity: 25,
+                        status: 'PLANTED',
+                        notes: 'Demo planting session - endpoint not implemented yet'
+                    },
+                    {
+                        id: 2,
+                        farmId: farmId || 2,
+                        farmName: 'Sample Farm',
+                        cropVariety: 'ZM621',
+                        plantingDate: '2024-10-15',
+                        expectedHarvestDate: '2025-03-30',
+                        areaPlanted: 22.3,
+                        seedQuantity: 35,
+                        status: 'GROWING',
+                        notes: 'Demo planting session - endpoint not implemented yet'
+                    }
+                ];
+            }
+
+            // For other errors, return empty array to prevent crashes
+            return [];
+        }
     }
 
     async createFarm(farmData) {

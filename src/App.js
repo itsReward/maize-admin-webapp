@@ -24,6 +24,7 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import FarmsDetailPage from "./pages/FarmsDetailPage";
 
 
+
 // Import placeholder page for missing routes
 import PlaceholderPage from './pages/PlaceholderPage';
 
