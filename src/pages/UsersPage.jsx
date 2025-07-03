@@ -8,7 +8,7 @@ const UsersPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   
   const { data: usersData, loading, error, refetch } = useApi(
-    () => apiService.getUsers(page, 10, searchTerm),
+    () => apiService.getUsers(page, 50, searchTerm),
     [page, searchTerm]
   );
 
