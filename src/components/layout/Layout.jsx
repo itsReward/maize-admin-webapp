@@ -142,7 +142,7 @@ const Layout = () => {
             href: '/analytics',
             icon: BarChart3,
             current: location.pathname === '/analytics',
-            roles: ['ADMIN']
+            roles: ['ADMIN', 'FARMER'],
         },
         {
             name: 'Settings',

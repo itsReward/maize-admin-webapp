@@ -10,23 +10,19 @@ class ApiService {
         this.failedEndpoints = new Set(); // Track endpoints that have failed
     }
 
-    // Logging helper methods
+    // Enhanced logging methods
     logRequest(method, url, data = null) {
         if (!this.enableLogging) return;
-
         console.group(`🔄 API Request: ${method.toUpperCase()} ${url}`);
         console.log('📤 Request URL:', url);
         console.log('🕒 Timestamp:', new Date().toISOString());
-        if (data) {
-            console.log('📦 Request Body:', data);
-        }
+        if (data) console.log('📦 Request Body:', data);
         console.log('🔑 Auth Headers:', authService.getAuthHeader());
         console.groupEnd();
     }
 
     logResponse(method, url, response, duration) {
         if (!this.enableLogging) return;
-
         console.group(`✅ API Response: ${method.toUpperCase()} ${url}`);
         console.log('📥 Response Data:', response);
         console.log('⏱️ Duration:', `${duration}ms`);
@@ -37,8 +33,6 @@ class ApiService {
     logError(method, url, error, duration, status) {
         const isAuthError = status === 401 || status === 403;
         const isMissingEndpoint = status === 404;
-        const isServerError = status >= 500;
-
         const logLevel = isAuthError ? 'error' : isMissingEndpoint ? 'warn' : 'error';
 
         console.group(`${isAuthError ? '❌' : isMissingEndpoint ? '⚠️' : '💥'} API ${logLevel.toUpperCase()}: ${method.toUpperCase()} ${url}`);
@@ -46,92 +40,13 @@ class ApiService {
         console[logLevel]('Status:', status);
         console[logLevel]('⏱️ Duration:', `${duration}ms`);
         console[logLevel]('🕒 Timestamp:', new Date().toISOString());
-
-        if (isMissingEndpoint) {
-            console.warn('📝 This endpoint may not be implemented yet. App will continue working.');
-            this.failedEndpoints.add(url);
-        } else if (isServerError) {
-            console.error('🔧 Server error - check backend logs');
-        }
-
         console.groupEnd();
     }
 
-    // Determine if an error should cause logout
-    shouldLogoutOnError(status, endpoint) {
-        // Only logout on authentication errors, not on missing endpoints or server errors
-        const isAuthError = status === 401 || status === 403;
-        const isMissingEndpoint = status === 404;
-        const isServerError = status >= 500;
-
-        // Don't logout for missing endpoints or server errors
-        if (isMissingEndpoint || isServerError) {
-            return false;
-        }
-
-        // Only logout for auth errors on protected endpoints
-        if (isAuthError) {
-            // Don't logout if it's a public endpoint
-            const publicEndpoints = ['/auth/login', '/auth/register', '/health'];
-            const isPublicEndpoint = publicEndpoints.some(pub => endpoint.includes(pub));
-            return !isPublicEndpoint;
-        }
-
-        return false;
-    }
-
-    // Create user-friendly error messages
-    createUserFriendlyError(status, endpoint, originalError) {
-        switch (status) {
-            case 404:
-                return {
-                    type: 'MISSING_ENDPOINT',
-                    message: 'This feature is not yet available',
-                    detail: `The endpoint ${endpoint} is not implemented`,
-                    canRetry: false,
-                    showToUser: false // Don't show 404s to users
-                };
-            case 500:
-            case 502:
-            case 503:
-                return {
-                    type: 'SERVER_ERROR',
-                    message: 'Server is temporarily unavailable',
-                    detail: 'Please try again in a moment',
-                    canRetry: true,
-                    showToUser: true
-                };
-            case 401:
-                return {
-                    type: 'AUTHENTICATION_ERROR',
-                    message: 'Your session has expired',
-                    detail: 'Please log in again',
-                    canRetry: false,
-                    showToUser: true
-                };
-            case 403:
-                return {
-                    type: 'PERMISSION_ERROR',
-                    message: 'You do not have permission to access this resource',
-                    detail: 'Contact your administrator if you believe this is an error',
-                    canRetry: false,
-                    showToUser: true
-                };
-            default:
-                return {
-                    type: 'UNKNOWN_ERROR',
-                    message: 'An unexpected error occurred',
-                    detail: originalError.message,
-                    canRetry: true,
-                    showToUser: true
-                };
-        }
-    }
-
-    // Generic request method with enhanced error handling
+    // Core HTTP methods with enhanced error handling
     async request(endpoint, options = {}) {
         const url = `${this.baseURL}${endpoint}`;
-        const startTime = performance.now();
+        const startTime = Date.now();
 
         const config = {
             headers: {
@@ -142,89 +57,41 @@ class ApiService {
             ...options,
         };
 
-        // Log the request
         this.logRequest(options.method || 'GET', url, options.body);
 
         try {
             const response = await fetch(url, config);
-            const duration = Math.round(performance.now() - startTime);
+            const duration = Date.now() - startTime;
 
             if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                const userFriendlyError = this.createUserFriendlyError(response.status, endpoint, { message: errorData.message });
-
-                // Log the error
-                this.logError(options.method || 'GET', url, userFriendlyError, duration, response.status);
-
-                // Only trigger logout for actual auth errors
-                if (this.shouldLogoutOnError(response.status, endpoint)) {
-                    console.error('🚪 Authentication error detected, triggering logout');
-                    window.dispatchEvent(new CustomEvent('auth-error', {
-                        detail: { status: response.status, endpoint, error: userFriendlyError }
-                    }));
-                }
-
-                // Create enhanced error with user-friendly info
-                const enhancedError = new Error(userFriendlyError.message);
-                enhancedError.status = response.status;
-                enhancedError.endpoint = endpoint;
-                enhancedError.userFriendly = userFriendlyError;
-                enhancedError.originalMessage = errorData.message || 'Unknown error';
-
-                throw enhancedError;
+                const error = new Error(`HTTP error! status: ${response.status}`);
+                error.status = response.status;
+                this.logError(options.method || 'GET', url, error, duration, response.status);
+                throw error;
             }
 
-            // Handle successful responses
-            const contentType = response.headers.get('content-type');
-            let responseData;
+            const data = await response.json();
+            this.logResponse(options.method || 'GET', url, data, duration);
 
-            if (contentType && contentType.includes('application/json')) {
-                responseData = await response.json();
-            } else {
-                responseData = await response.text();
-            }
+            // Remove from failed endpoints if request succeeds
+            this.failedEndpoints.delete(endpoint);
 
-            // Log successful response
-            this.logResponse(options.method || 'GET', url, responseData, duration);
-
-            return responseData;
+            return data;
         } catch (error) {
-            const duration = Math.round(performance.now() - startTime);
+            const duration = Date.now() - startTime;
+            this.logError(options.method || 'GET', url, error, duration, error.status);
 
-            // Handle network errors (fetch failures)
-            if (!error.status) {
-                const networkError = this.createUserFriendlyError(0, endpoint, error);
-                this.logError(options.method || 'GET', url, networkError, duration, 0);
+            // Track failed endpoints
+            this.failedEndpoints.add(endpoint);
 
-                const enhancedError = new Error(networkError.message);
-                enhancedError.status = 0;
-                enhancedError.endpoint = endpoint;
-                enhancedError.userFriendly = networkError;
-                enhancedError.originalError = error;
-
-                throw enhancedError;
-            }
-
-            // Re-throw errors that already have status (handled above)
             throw error;
         }
     }
 
-    // GET request with fallback
-    async get(endpoint, fallbackData = null) {
-        try {
-            return await this.request(endpoint, { method: 'GET' });
-        } catch (error) {
-            // For missing endpoints, return fallback data instead of throwing
-            if (error.status === 404 && fallbackData !== null) {
-                console.warn(`🔄 Using fallback data for ${endpoint}`);
-                return fallbackData;
-            }
-            throw error;
-        }
+    async get(endpoint) {
+        return this.request(endpoint);
     }
 
-    // POST request
     async post(endpoint, data) {
         return this.request(endpoint, {
             method: 'POST',
@@ -232,7 +99,6 @@ class ApiService {
         });
     }
 
-    // PUT request
     async put(endpoint, data) {
         return this.request(endpoint, {
             method: 'PUT',
@@ -240,38 +106,334 @@ class ApiService {
         });
     }
 
-    // DELETE request
     async delete(endpoint) {
-        return this.request(endpoint, { method: 'DELETE' });
+        return this.request(endpoint, {
+            method: 'DELETE',
+        });
     }
 
-    // Dashboard APIs with fallbacks
+    // =====================================
+    // DASHBOARD & ANALYTICS APIs - ENHANCED
+    // =====================================
+
     async getDashboardStats() {
         try {
             return await this.get('/dashboard/stats');
         } catch (error) {
             if (error.status === 404) {
-                // Return mock data for missing dashboard stats
+                console.warn('⚠️ Dashboard stats endpoint not found, returning enhanced mock data');
                 return {
-                    totalFarms: 0,
-                    totalUsers: 0,
-                    activeSessions: 0,
-                    totalYield: 0
+                    avgYield: 4.2,
+                    yieldTrend: 12.5,
+                    predictionAccuracy: 87.5,
+                    activeFarms: 22,
+                    totalArea: '--',
+                    totalUsers: 156,
+                    totalFarmers: 89,
+                    activeSessions: 34,
+                    totalPredictions: 267,
+                    yieldGrowth: 8.3,
+                    userGrowth: 15.2,
+                    farmerGrowth: 12.8,
+                    sessionGrowth: 22.1,
+                    predictionGrowth: 18.7,
+                    modelAccuracy: 87.5,
+                    accuracyImprovement: 3.2,
+                    lastUpdated: new Date().toISOString(),
+                    note: 'Enhanced mock data - replace with real API'
                 };
             }
             throw error;
         }
     }
 
-    async getRecentActivity() {
+    async getYieldTrends(dateRange = '6months', farmId = null) {
         try {
-            return await this.get('/dashboard/recent-activity');
+            const params = new URLSearchParams();
+            if (dateRange) params.append('dateRange', dateRange);
+            if (farmId) params.append('farmId', farmId);
+
+            return await this.get(`/dashboard/yield-trends?${params}`);
         } catch (error) {
             if (error.status === 404) {
-                return []; // Return empty array for missing recent activity
+                console.warn('⚠️ Yield trends endpoint not found, returning enhanced mock data');
+                return this.getMockYieldTrends(dateRange);
             }
             throw error;
         }
+    }
+
+    // Enhanced Analytics API with comprehensive mock data
+    async getAnalytics(type, params = {}) {
+        try {
+            const queryParams = new URLSearchParams(params);
+            return await this.get(`/analytics/${type}?${queryParams}`);
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn(`⚠️ Analytics endpoint for ${type} not found, returning enhanced mock data`);
+                return this.getMockAnalyticsData(type, params);
+            }
+            throw error;
+        }
+    }
+
+    // New method for insights and recommendations
+    async getInsightsAndRecommendations(farmId = null, dateRange = '6months') {
+        try {
+            const params = new URLSearchParams();
+            if (farmId) params.append('farmId', farmId);
+            if (dateRange) params.append('dateRange', dateRange);
+
+            return await this.get(`/analytics/insights-recommendations?${params}`);
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn('⚠️ Insights & recommendations endpoint not found, returning mock data');
+                return this.getMockInsightsRecommendations();
+            }
+            throw error;
+        }
+    }
+
+    // New method for quick stats
+    async getQuickStats(farmId = null) {
+        try {
+            const params = farmId ? `?farmId=${farmId}` : '';
+            return await this.get(`/analytics/quick-stats${params}`);
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn('⚠️ Quick stats endpoint not found, returning mock data');
+                return this.getMockQuickStats();
+            }
+            throw error;
+        }
+    }
+
+    // Enhanced alerts and tasks
+    async getAlerts() {
+        try {
+            return await this.get('/alerts');
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn('⚠️ Alerts endpoint not found, returning mock data');
+                return [];
+            }
+            throw error;
+        }
+    }
+
+    async getTasks() {
+        try {
+            return await this.get('/tasks');
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn('⚠️ Tasks endpoint not found, returning mock data');
+                return [];
+            }
+            throw error;
+        }
+    }
+
+    async getRecentActivity(limit = 10) {
+        try {
+            return await this.get(`/dashboard/recent-activity?limit=${limit}`);
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn('⚠️ Recent activity endpoint not found, returning mock data');
+                return this.getMockRecentActivity();
+            }
+            throw error;
+        }
+    }
+
+    // =====================================
+    // MOCK DATA GENERATORS - ENHANCED
+    // =====================================
+
+    getMockYieldTrends(dateRange = '6months') {
+        const monthsMap = {
+            '3months': 3,
+            '6months': 6,
+            '12months': 12,
+            'year': 12
+        };
+
+        const months = monthsMap[dateRange] || 6;
+        const trends = [];
+
+        for (let i = months - 1; i >= 0; i--) {
+            const date = new Date();
+            date.setMonth(date.getMonth() - i);
+
+            trends.push({
+                month: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+                yield: Number((3.5 + Math.random() * 2 + Math.sin(i * 0.5) * 0.5).toFixed(1)),
+                predicted: Number((3.8 + Math.random() * 1.8 + Math.sin(i * 0.5) * 0.4).toFixed(1)),
+                target: 4.5,
+                date: date.toISOString()
+            });
+        }
+
+        return trends;
+    }
+
+    getMockAnalyticsData(type, params) {
+        const baseData = {
+            insights: [
+                "Average yield has increased by 12.5% compared to last season",
+                "Weather conditions have been favorable for the past 3 months",
+                "Soil moisture levels are optimal in 78% of monitored farms",
+                "Prediction accuracy has improved to 87.5% with recent model updates"
+            ],
+            recommendations: [
+                "Consider increasing fertilizer application by 10% for upcoming season",
+                "Implement drip irrigation in areas with inconsistent rainfall",
+                "Monitor for pest activity during the next 2 weeks",
+                "Schedule soil testing for farms showing declining yields"
+            ]
+        };
+
+        switch (type) {
+            case 'yield-trends':
+                return {
+                    ...baseData,
+                    chartData: this.getMockYieldTrends(params.dateRange),
+                    summary: {
+                        averageYield: 4.2,
+                        yieldGrowth: 12.5,
+                        bestPerformingFarm: "Farm A",
+                        totalFarmsAnalyzed: 22
+                    }
+                };
+
+            case 'farm-performance':
+                return {
+                    ...baseData,
+                    chartData: [
+                        { farm: 'Farm A', yield: 4.8, efficiency: 92, area: 25 },
+                        { farm: 'Farm B', yield: 4.2, efficiency: 85, area: 18 },
+                        { farm: 'Farm C', yield: 3.9, efficiency: 78, area: 32 },
+                        { farm: 'Farm D', yield: 4.5, efficiency: 88, area: 22 },
+                        { farm: 'Farm E', yield: 4.1, efficiency: 82, area: 28 }
+                    ],
+                    summary: {
+                        topPerformer: "Farm A",
+                        averageEfficiency: 85,
+                        totalArea: 125
+                    }
+                };
+
+            case 'prediction-accuracy':
+                return {
+                    ...baseData,
+                    chartData: [
+                        { month: 'Jan', accuracy: 82, predictions: 45 },
+                        { month: 'Feb', accuracy: 85, predictions: 52 },
+                        { month: 'Mar', accuracy: 87, predictions: 48 },
+                        { month: 'Apr', accuracy: 89, predictions: 61 },
+                        { month: 'May', accuracy: 87, predictions: 58 },
+                        { month: 'Jun', accuracy: 91, predictions: 64 }
+                    ],
+                    summary: {
+                        currentAccuracy: 87.5,
+                        improvement: 3.2,
+                        totalPredictions: 328
+                    }
+                };
+
+            case 'weather-analysis':
+                return {
+                    ...baseData,
+                    chartData: [
+                        { date: '2025-06-01', temperature: 24, rainfall: 12, humidity: 65 },
+                        { date: '2025-06-02', temperature: 26, rainfall: 0, humidity: 58 },
+                        { date: '2025-06-03', temperature: 25, rainfall: 8, humidity: 72 },
+                        { date: '2025-06-04', temperature: 23, rainfall: 15, humidity: 78 },
+                        { date: '2025-06-05', temperature: 27, rainfall: 0, humidity: 55 },
+                        { date: '2025-06-06', temperature: 28, rainfall: 3, humidity: 62 },
+                        { date: '2025-06-07', temperature: 26, rainfall: 18, humidity: 81 }
+                    ],
+                    summary: {
+                        averageTemperature: 25.6,
+                        totalRainfall: 56,
+                        averageHumidity: 67.3
+                    }
+                };
+
+            case 'crop-health':
+                return {
+                    ...baseData,
+                    chartData: [
+                        { metric: 'Healthy', value: 78, color: '#22c55e' },
+                        { metric: 'At Risk', value: 15, color: '#f59e0b' },
+                        { metric: 'Critical', value: 7, color: '#ef4444' }
+                    ],
+                    summary: {
+                        healthyPercentage: 78,
+                        atRiskFarms: 15,
+                        criticalIssues: 7
+                    }
+                };
+
+            default:
+                return { ...baseData, chartData: [], summary: {} };
+        }
+    }
+
+    getMockInsightsRecommendations() {
+        return {
+            insights: [
+                "Your farms are performing 15% above regional average",
+                "Weather patterns indicate optimal planting conditions for next month",
+                "Soil nutrient levels are within acceptable ranges across 85% of farms",
+                "Recent rainfall has improved soil moisture to optimal levels",
+                "Current yield predictions show 8% improvement over last season"
+            ],
+            recommendations: [
+                "Apply nitrogen fertilizer to farms showing deficiency symptoms",
+                "Schedule irrigation for farms in the eastern region due to low rainfall forecast",
+                "Consider planting drought-resistant varieties in area zones 3 and 4",
+                "Implement pest monitoring protocols for the upcoming growing season",
+                "Optimize planting density based on soil test results from last quarter"
+            ],
+            priority: {
+                high: 2,
+                medium: 5,
+                low: 3
+            },
+            lastUpdated: new Date().toISOString()
+        };
+    }
+
+    getMockQuickStats() {
+        return {
+            bestPerformingFarm: "Sunset Valley Farm",
+            topCropVariety: "SC627",
+            seasonProgress: 65,
+            weatherFavorability: 82,
+            avgSoilHealth: 78,
+            irrigationEfficiency: 91,
+            pestRiskLevel: "Low",
+            harvestReadiness: "23%",
+            lastUpdated: new Date().toISOString()
+        };
+    }
+
+    getMockRecentActivity() {
+        const activities = [
+            "New yield prediction generated for Farm Delta",
+            "Weather alert issued for central region",
+            "Irrigation schedule updated for 5 farms",
+            "Soil test results received for Farm Alpha",
+            "Fertilizer recommendation sent to 12 farmers"
+        ];
+
+        return activities.map((activity, index) => ({
+            id: index + 1,
+            description: activity,
+            timestamp: new Date(Date.now() - index * 2 * 60 * 60 * 1000).toISOString(),
+            type: ['prediction', 'alert', 'irrigation', 'soil', 'recommendation'][index],
+            priority: ['medium', 'high', 'low', 'medium', 'low'][index]
+        }));
     }
 
     // User APIs
