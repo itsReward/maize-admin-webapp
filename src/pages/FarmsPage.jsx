@@ -1,11 +1,10 @@
 // src/pages/FarmsPage.jsx
-import React, { useState } from 'react';
+import React, { useState, useMemo} from 'react';
 import { Plus, MapPin, User, Calendar, Edit, Trash2, Eye } from 'lucide-react';
 import apiService from '../services/apiService';
 import { useApi } from '../hooks/useApi';
 import DataTable from '../components/common/DataTable';
 import Modal from '../components/common/Modal';
-import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const FarmsPage = () => {
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -24,6 +23,41 @@ const FarmsPage = () => {
         () => apiService.getFarms(),
         []
     );
+
+    const owners = useMemo(() => {
+        if (!farms || farms.length === 0) return [];
+
+        // Create a map of unique owners using farm.ownerId (or similar identifier)
+        const ownersMap = new Map();
+
+        farms.forEach(farm => {
+            // Assuming each farm has ownerId, ownerName, and contactNumber
+            if (farm.ownerId && !ownersMap.has(farm.ownerId)) {
+                ownersMap.set(farm.ownerId, {
+                    id: farm.ownerId,
+                    name: farm.ownerName || 'Unknown Owner',
+                    phone: farm.contactNumber || 'N/A',
+                    email: farm.ownerEmail || 'N/A'
+                });
+            }
+        });
+
+        return Array.from(ownersMap.values());
+    }, [farms]);
+
+
+    const getOwnerDetailsById = (ownerId, ownersList) => {
+        // Handle case where ownersList is not yet loaded or ownerId is missing
+        if (!ownersList || !ownerId) {
+            return { name: 'Unknown Owner', email: 'N/A', phone: 'N/A' };
+        }
+
+        const owner = ownersList.find(owner => owner.id === ownerId);
+
+        // If owner is found, return their details, otherwise return default values
+        return owner || { name: 'Unknown Owner', email: 'N/A', phone: 'N/A' };
+    };
+
 
     // Safe data handling with fallbacks
     const farmData = React.useMemo(() => {
@@ -114,7 +148,7 @@ const FarmsPage = () => {
     const getTotalArea = () => {
         if (!Array.isArray(farmData) || farmData.length === 0) return 0;
         try {
-            return farmData.reduce((sum, farm) => sum + (parseFloat(farm.size) || 0), 0);
+            return farmData.reduce((sum, farm) => sum + (parseFloat(farm.sizeHectares) || 0), 0);
         } catch (error) {
             console.error('❌ Error calculating total area:', error);
             return 0;
@@ -144,29 +178,40 @@ const FarmsPage = () => {
             )
         },
         {
-            key: 'size',
+            key: 'sizeHectares',
             label: 'Size (hectares)',
             render: (value) => value ? `${parseFloat(value).toFixed(1)} ha` : 'N/A'
         },
-        {
+        /*{
             key: 'soilType',
             label: 'Soil Type',
             render: (value) => value || 'N/A'
-        },
+        },*/
         {
-            key: 'ownerName',
+            key: 'ownerId',
             label: 'Owner',
-            render: (value) => (
-                <div className="flex items-center">
-                    <User className="w-4 h-4 text-gray-400 mr-2" />
-                    {value || 'N/A'}
-                </div>
-            )
+            render: (ownerId, farm) => {
+                // If we have a direct ownerName on the farm, use it
+                if (farm.ownerName) return farm.ownerName;
+
+                // Otherwise, try to find the owner in our extracted owners list
+                const owner = getOwnerDetailsById(ownerId);
+                return owner.name;
+            }
+
         },
         {
-            key: 'contactNumber',
+            key: 'ownerId',
             label: 'Contact',
-            render: (value) => value || 'N/A'
+            render: (ownerId, farm) => {
+                // If we have a direct contactNumber on the farm, use it
+                if (farm.contactNumber) return farm.contactNumber;
+
+                // Otherwise, try to find the owner in our extracted owners list
+                const owner = getOwnerDetailsById(ownerId);
+                return owner.phone;
+            }
+
         },
         {
             key: 'actions',
@@ -486,7 +531,7 @@ const FarmsPage = () => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-600">Size</label>
-                                <p className="text-lg">{selectedFarm.size} hectares</p>
+                                <p className="text-lg">{selectedFarm.sizeHectares} hectares</p>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-600">Soil Type</label>

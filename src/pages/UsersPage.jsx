@@ -13,7 +13,7 @@ const UsersPage = () => {
   );
 
   const columns = [
-    { key: 'name', label: 'Name' },
+    { key: 'username', label: 'Name' },
     { key: 'email', label: 'Email' },
     { key: 'role', label: 'Role', render: (value) => (
       <span className={`px-2 py-1 rounded-full text-xs ${
@@ -22,13 +22,9 @@ const UsersPage = () => {
         {value}
       </span>
     )},
-    { key: 'status', label: 'Status', render: (value) => (
-      <span className={`px-2 py-1 rounded-full text-xs ${
-        value === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-      }`}>
-        {value}
-      </span>
-    )},
+    { key: 'createdAt', label: 'Joined', render: (value) =>
+          value ? new Date(value).toLocaleDateString() : 'Never'
+    },
     { key: 'lastLogin', label: 'Last Login', render: (value) => 
       value ? new Date(value).toLocaleDateString() : 'Never'
     }

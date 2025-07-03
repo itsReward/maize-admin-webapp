@@ -1,7 +1,7 @@
 // src/services/apiService.js - Enhanced to handle missing endpoints gracefully
 import authService from './authService';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8181/api';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8181/api/api';
 
 class ApiService {
     constructor() {
@@ -448,7 +448,7 @@ class ApiService {
     }
 
     async createPlantingSession(farmId, sessionData) {
-        return this.post(`/farms/${farmId}/planting-sessions`, sessionData);
+        return this.post(`/planting-sessions/create/${farmId}`, sessionData);
     }
 
     async updatePlantingSession(sessionId, sessionData) {
@@ -475,18 +475,27 @@ class ApiService {
 // ===========================================
 // WEATHER APIs
 // ===========================================
+
+    /**
+     * Get current weather data by location
+     * NEW ENDPOINT: GET /api/weather/current?location=Harare
+     */
     async getWeatherData(location) {
         try {
-            const response = await this.get(`/weather?location=${encodeURIComponent(location)}`);
+            const response = await this.get(`/weather/current?location=${encodeURIComponent(location)}`);
             return response;
         } catch (error) {
-            if (error.status === 404) {
-                console.warn('⚠️ Weather data endpoint not found, returning mock data');
+            if (error.status === 404 || error.status === 405) {
+                console.warn('⚠️ Weather current endpoint not found, returning mock data');
                 return {
                     location: location,
                     temperature: 25,
                     humidity: 60,
                     rainfall: 0,
+                    windSpeed: 12,
+                    pressure: 1013,
+                    visibility: 10,
+                    uvIndex: 6,
                     conditions: 'Sunny',
                     forecast: 'Clear skies expected',
                     timestamp: new Date().toISOString(),
@@ -497,120 +506,320 @@ class ApiService {
         }
     }
 
-    async getWeatherHistory(farmId, startDate, endDate) {
+    /**
+     * Get weather history with optional farm ID
+     * NEW ENDPOINT: GET /api/weather/history?farmId=1&startDate=2025-06-15&endDate=2025-06-22
+     */
+    async getWeatherHistory(farmId = null, startDate, endDate) {
         try {
-            const params = new URLSearchParams({ farmId, startDate, endDate });
+            const params = new URLSearchParams();
+            if (farmId) params.append('farmId', farmId);
+            params.append('startDate', startDate);
+            params.append('endDate', endDate);
+
             const response = await this.get(`/weather/history?${params}`);
             return Array.isArray(response) ? response : [];
         } catch (error) {
-            if (error.status === 404) {
+            if (error.status === 404 || error.status === 405) {
                 console.warn('⚠️ Weather history endpoint not found, returning mock data');
-                return [
-                    {
-                        date: '2024-06-01',
-                        temperature: 24,
-                        humidity: 65,
-                        rainfall: 2.5,
-                        conditions: 'Partly Cloudy'
-                    },
-                    {
-                        date: '2024-06-02',
-                        temperature: 26,
-                        humidity: 58,
-                        rainfall: 0,
-                        conditions: 'Sunny'
-                    },
-                    {
-                        date: '2024-06-03',
-                        temperature: 23,
-                        humidity: 72,
-                        rainfall: 8.2,
-                        conditions: 'Rainy'
-                    }
-                ];
+                return this.getMockWeatherHistory(startDate, endDate);
             }
             throw error;
         }
     }
 
-// ===========================================
-// PLANTING SESSION APIs
-// ===========================================
-    async getPlantingSessions(farmId = null) {
+    /**
+     * Get current weather for a specific farm
+     * NEW ENDPOINT: GET /api/weather/farms/{farmId}/current
+     */
+    async getCurrentWeatherForFarm(farmId) {
         try {
-            const endpoint = farmId ? `/farms/${farmId}/planting-sessions` : '/planting-sessions';
-            const response = await this.get(endpoint);
-
-            if (!response) {
-                console.warn('⚠️ getPlantingSessions returned null/undefined, returning empty array');
-                return [];
-            }
-
-            if (!Array.isArray(response)) {
-                console.warn('⚠️ getPlantingSessions response is not an array:', typeof response, response);
-                if (response && response.content && Array.isArray(response.content)) {
-                    return response.content;
-                }
-                return [];
-            }
-
+            const response = await this.get(`/weather/farms/${farmId}/current`);
             return response;
         } catch (error) {
-            if (error.status === 404) {
-                console.warn('⚠️ Planting sessions endpoint not found, returning mock data');
-                return [
-                    {
-                        id: 1,
-                        farmName: 'Demo Farm',
-                        cropVariety: 'SC627',
-                        plantingDate: '2024-11-01',
-                        expectedHarvestDate: '2025-04-15',
-                        areaPlanted: 15.5,
-                        seedQuantity: 25,
-                        status: 'PLANTED',
-                        notes: 'Demo planting session'
-                    },
-                    {
-                        id: 2,
-                        farmName: 'Sample Farm',
-                        cropVariety: 'ZM621',
-                        plantingDate: '2024-10-15',
-                        expectedHarvestDate: '2025-03-30',
-                        areaPlanted: 22.3,
-                        seedQuantity: 35,
-                        status: 'GROWING',
-                        notes: 'Demo planting session'
-                    }
-                ];
+            if (error.status === 404 || error.status === 405) {
+                console.warn(`⚠️ Weather for farm ${farmId} not found, returning mock data`);
+                return {
+                    farmId: farmId,
+                    temperature: 24,
+                    humidity: 65,
+                    rainfall: 2.5,
+                    windSpeed: 12,
+                    pressure: 1013,
+                    conditions: 'Partly Cloudy',
+                    timestamp: new Date().toISOString(),
+                    note: 'Demo weather data for farm'
+                };
             }
-            console.warn('⚠️ getPlantingSessions failed, returning empty array');
-            return [];
+            throw error;
         }
     }
 
-    async getPlantingSessionById(sessionId) {
+    /**
+     * Get weather history for a specific farm
+     * NEW ENDPOINT: GET /api/weather/farms/{farmId}/history?days=7
+     */
+    async getWeatherHistoryForFarm(farmId, days = 7) {
         try {
-            return await this.get(`/planting-sessions/${sessionId}`);
+            const response = await this.get(`/weather/farms/${farmId}/history?days=${days}`);
+            return Array.isArray(response) ? response : [];
+        } catch (error) {
+            if (error.status === 404 || error.status === 405) {
+                console.warn(`⚠️ Weather history for farm ${farmId} not found, returning mock data`);
+                return this.getMockWeatherHistory(
+                    new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    new Date().toISOString().split('T')[0]
+                );
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Get all weather data for a farm
+     * NEW ENDPOINT: GET /api/weather/farms/{farmId}/weather
+     */
+    async getWeatherDataByFarmId(farmId) {
+        try {
+            const response = await this.get(`/weather/farms/${farmId}/weather`);
+            return Array.isArray(response) ? response : [];
+        } catch (error) {
+            if (error.status === 404 || error.status === 405) {
+                console.warn(`⚠️ Weather data for farm ${farmId} not found, returning mock data`);
+                return this.getMockWeatherHistory();
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Get weather data for a specific date range
+     * NEW ENDPOINT: GET /api/weather/farms/{farmId}/weather/date-range?startDate=2025-06-15&endDate=2025-06-22
+     */
+    async getWeatherDataByDateRange(farmId, startDate, endDate) {
+        try {
+            const params = new URLSearchParams({ startDate, endDate });
+            const response = await this.get(`/weather/farms/${farmId}/weather/date-range?${params}`);
+            return Array.isArray(response) ? response : [];
+        } catch (error) {
+            if (error.status === 404 || error.status === 405) {
+                console.warn(`⚠️ Weather date range for farm ${farmId} not found, returning mock data`);
+                return this.getMockWeatherHistory(startDate, endDate);
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Get weather data by ID
+     * NEW ENDPOINT: GET /api/weather/data/{weatherDataId}
+     */
+    async getWeatherDataById(weatherDataId) {
+        try {
+            const response = await this.get(`/weather/data/${weatherDataId}`);
+            return response;
         } catch (error) {
             if (error.status === 404) {
-                console.warn(`⚠️ Planting session ${sessionId} not found`);
+                console.warn(`⚠️ Weather data ${weatherDataId} not found`);
                 return null;
             }
             throw error;
         }
     }
 
-    async createPlantingSession(farmId, sessionData) {
-        return this.post(`/farms/${farmId}/planting-sessions`, sessionData);
+    /**
+     * Add weather data manually
+     * NEW ENDPOINT: POST /api/weather/data
+     */
+    async addWeatherData(weatherData) {
+        try {
+            return await this.post('/weather/data', weatherData);
+        } catch (error) {
+            console.error('Failed to add weather data:', error);
+            throw error;
+        }
     }
 
-    async updatePlantingSession(sessionId, sessionData) {
-        return this.put(`/planting-sessions/${sessionId}`, sessionData);
+    /**
+     * Update weather data
+     * NEW ENDPOINT: PUT /api/weather/data/{weatherDataId}
+     */
+    async updateWeatherData(weatherDataId, weatherData) {
+        try {
+            return await this.put(`/weather/data/${weatherDataId}`, weatherData);
+        } catch (error) {
+            console.error(`Failed to update weather data ${weatherDataId}:`, error);
+            throw error;
+        }
     }
 
-    async deletePlantingSession(sessionId) {
-        return this.delete(`/planting-sessions/${sessionId}`);
+    /**
+     * Delete weather data
+     * NEW ENDPOINT: DELETE /api/weather/data/{weatherDataId}
+     */
+    async deleteWeatherData(weatherDataId) {
+        try {
+            return await this.delete(`/weather/data/${weatherDataId}`);
+        } catch (error) {
+            console.error(`Failed to delete weather data ${weatherDataId}:`, error);
+            throw error;
+        }
     }
+
+    /**
+     * Get latest weather data for a farm
+     * NEW ENDPOINT: GET /api/weather/farms/{farmId}/weather/latest
+     */
+    async getLatestWeatherData(farmId) {
+        try {
+            const response = await this.get(`/weather/farms/${farmId}/weather/latest`);
+            return response;
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn(`⚠️ Latest weather for farm ${farmId} not found`);
+                return null;
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Fetch weather data from external API
+     * NEW ENDPOINT: POST /api/weather/farms/{farmId}/weather/fetch
+     */
+    async fetchWeatherDataForFarm(farmId) {
+        try {
+            return await this.post(`/weather/farms/${farmId}/weather/fetch`);
+        } catch (error) {
+            console.error(`Failed to fetch weather for farm ${farmId}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get weather forecast
+     * NEW ENDPOINT: GET /api/weather/farms/{farmId}/weather/forecast?days=7
+     */
+    async getWeatherForecast(farmId, days = 7) {
+        try {
+            const response = await this.get(`/weather/farms/${farmId}/weather/forecast?days=${days}`);
+            return response;
+        } catch (error) {
+            if (error.status === 404 || error.status === 405) {
+                console.warn(`⚠️ Weather forecast for farm ${farmId} not found, returning mock data`);
+                return {
+                    farmId: farmId,
+                    days: days,
+                    forecast: this.getMockForecastData(days),
+                    note: 'Demo forecast data'
+                };
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Get historical weather data for a specific date
+     * NEW ENDPOINT: GET /api/weather/farms/{farmId}/weather/historical/{date}
+     */
+    async getHistoricalWeatherData(farmId, date) {
+        try {
+            const response = await this.get(`/weather/farms/${farmId}/weather/historical/${date}`);
+            return response;
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn(`⚠️ Historical weather for farm ${farmId} on ${date} not found`);
+                return null;
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Get weather alerts for a farm
+     * NEW ENDPOINT: GET /api/weather/farms/{farmId}/weather/alerts
+     */
+    async getWeatherAlerts(farmId) {
+        try {
+            const response = await this.get(`/weather/farms/${farmId}/weather/alerts`);
+            return Array.isArray(response) ? response : [];
+        } catch (error) {
+            if (error.status === 404 || error.status === 405) {
+                console.warn(`⚠️ Weather alerts for farm ${farmId} not found, returning empty array`);
+                return [];
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Get weather statistics for a farm
+     * NEW ENDPOINT: GET /api/weather/farms/{farmId}/weather/statistics
+     */
+    async getWeatherStatistics(farmId) {
+        try {
+            const response = await this.get(`/weather/farms/${farmId}/weather/statistics`);
+            return response;
+        } catch (error) {
+            if (error.status === 404 || error.status === 405) {
+                console.warn(`⚠️ Weather statistics for farm ${farmId} not found, returning mock data`);
+                return {
+                    farmId: farmId,
+                    totalRecords: 0,
+                    averageTemperature: 24,
+                    totalRainfall: 0,
+                    dataRange: 'No data available',
+                    note: 'Demo statistics'
+                };
+            }
+            throw error;
+        }
+    }
+
+    // ===========================================
+    // HELPER METHODS FOR MOCK DATA
+    // ===========================================
+
+    getMockWeatherHistory(startDate, endDate) {
+        const start = startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const end = endDate ? new Date(endDate) : new Date();
+        const data = [];
+
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            data.push({
+                date: d.toISOString().split('T')[0],
+                temperature: Math.round(20 + Math.random() * 10),
+                humidity: Math.round(50 + Math.random() * 30),
+                rainfall: Math.round(Math.random() * 15 * 100) / 100,
+                windSpeed: Math.round(5 + Math.random() * 15),
+                pressure: Math.round(1000 + Math.random() * 50),
+                conditions: ['Sunny', 'Partly Cloudy', 'Cloudy', 'Rainy'][Math.floor(Math.random() * 4)]
+            });
+        }
+
+        return data;
+    }
+
+    getMockForecastData(days) {
+        const forecast = [];
+        for (let i = 1; i <= days; i++) {
+            const date = new Date();
+            date.setDate(date.getDate() + i);
+
+            forecast.push({
+                date: date.toISOString().split('T')[0],
+                temperature: Math.round(20 + Math.random() * 10),
+                humidity: Math.round(50 + Math.random() * 30),
+                rainfall: Math.round(Math.random() * 10 * 100) / 100,
+                conditions: ['Sunny', 'Partly Cloudy', 'Cloudy', 'Light Rain'][Math.floor(Math.random() * 4)]
+            });
+        }
+        return forecast;
+    }
+
+// ===========================================
+// PLANTING SESSION APIs
+// ===========================================
 
 // ===========================================
 // PREDICTION APIs

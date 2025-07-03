@@ -85,7 +85,7 @@ const LoginPage = () => {
                         Welcome Back
                     </h1>
                     <p className="text-gray-600">
-                        Sign in to your Maize Admin account
+                        Sign in to your HarvestIQ Admin account
                     </p>
                 </div>
 

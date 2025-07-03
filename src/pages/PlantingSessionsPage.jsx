@@ -12,13 +12,19 @@ const PlantingSessionsPage = () => {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     farmId: '',
-    cropVariety: '',
+    maizeVariety: '',
     plantingDate: '',
     expectedHarvestDate: '',
     areaPlanted: '',
     seedQuantity: '',
     notes: ''
   });
+
+  const getFarmNameById = (farmId) => {
+    const farm = farmData.find(farm => farm.id === farmId);
+    return farm ? farm.name : 'Unknown Farm';
+  };
+
 
   const { data: sessions, loading, error, refetch } = useApi(
       () => apiService.getPlantingSessions(),
@@ -49,7 +55,7 @@ const PlantingSessionsPage = () => {
       setIsCreateModalOpen(false);
       setFormData({
         farmId: '',
-        cropVariety: '',
+        maizeVariety: '',
         plantingDate: '',
         expectedHarvestDate: '',
         areaPlanted: '',
@@ -99,13 +105,14 @@ const PlantingSessionsPage = () => {
 
   const columns = [
     { key: 'id', label: 'Session ID', render: (value) => `#${value}` },
-    { key: 'farmName', label: 'Farm', render: (value) => (
+    { key: 'farmId', label: 'Farm', render: (value) => (
           <div className="flex items-center">
             <MapPin className="w-4 h-4 text-gray-400 mr-2" />
-            {value || 'Unknown Farm'}
+            {getFarmNameById(value) || 'Unknown Farm'}
           </div>
       )},
-    { key: 'cropVariety', label: 'Crop Variety' },
+    { key: 'maizeVariety', label: 'Crop Variety' , render: (value) =>
+          value ? `${value.name}` : 'N/A'},
     { key: 'plantingDate', label: 'Planting Date', render: (value) => (
           <div className="flex items-center">
             <Calendar className="w-4 h-4 text-gray-400 mr-2" />
@@ -208,9 +215,10 @@ const PlantingSessionsPage = () => {
 
   // Calculate stats
   const totalSessions = sessionData.length;
-  const activeSessions = sessionData.filter(s => s.status === 'PLANTED' || s.status === 'GROWING').length;
+  const currentDate = new Date();
+  const activeSessions = sessionData.filter(s => new Date(s.expectedHarvestDate) > currentDate).length;
   const totalArea = sessionData.reduce((sum, session) => sum + (session.areaPlanted || 0), 0);
-  const harvestedSessions = sessionData.filter(s => s.status === 'HARVESTED').length;
+  const harvestedSessions = sessionData.filter(s => new Date(s.expectedHarvestDate) < currentDate).length;
 
   return (
       <div className="space-y-6">
@@ -323,7 +331,7 @@ const PlantingSessionsPage = () => {
                 </label>
                 <select
                     name="cropVariety"
-                    value={formData.cropVariety}
+                    value={formData.maizeVariety}
                     onChange={handleInputChange}
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
@@ -454,7 +462,7 @@ const PlantingSessionsPage = () => {
                     <label className="block text-sm font-medium text-gray-600 mb-1">
                       Farm
                     </label>
-                    <p className="text-gray-900">{selectedSession.farmName}</p>
+                    <p className="text-gray-900">{getFarmNameById(selectedSession.farmId)}</p>
                   </div>
                 </div>
 
@@ -463,7 +471,7 @@ const PlantingSessionsPage = () => {
                     <label className="block text-sm font-medium text-gray-600 mb-1">
                       Crop Variety
                     </label>
-                    <p className="text-gray-900">{selectedSession.cropVariety}</p>
+                    <p className="text-gray-900">{selectedSession.maizeVariety.name}</p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1">
@@ -503,7 +511,8 @@ const PlantingSessionsPage = () => {
                     <label className="block text-sm font-medium text-gray-600 mb-1">
                       Seed Quantity
                     </label>
-                    <p className="text-gray-900">{selectedSession.seedQuantity} kg</p>
+                    <p className="text-gray-900">{selectedSession.
+                        seedRateKgPerHectare} kg</p>
                   </div>
                 </div>
 
