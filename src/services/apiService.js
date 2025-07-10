@@ -1494,9 +1494,704 @@ class ApiService {
         return forecast;
     }
 
-// ===========================================
-// PLANTING SESSION APIs
-// ===========================================
+// =====================================
+// FARMER-SPECIFIC ANALYTICS APIs
+// =====================================
+
+    /**
+     * Get dashboard stats specific to a farmer
+     * @param {number} userId - Farmer's user ID
+     */
+    async getFarmerDashboardStats(userId) {
+        try {
+            return await this.get(`/farmers/${userId}/dashboard/stats`);
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn(`⚠️ Farmer dashboard stats for user ${userId} not found, returning mock data`);
+                return {
+                    avgYield: 3.8,
+                    yieldTrend: 8.5,
+                    predictionAccuracy: 84.3,
+                    activeFarms: 2,
+                    totalArea: 23.7,
+                    totalPredictions: 92,
+                    yieldGrowth: 6.8,
+                    predictionGrowth: 15.2,
+                    modelAccuracy: 84.3,
+                    accuracyImprovement: 2.8,
+                    lastUpdated: new Date().toISOString(),
+                    note: 'Demo data for farmer - API not available'
+                };
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Get quick stats specific to a farmer
+     * @param {number} userId - Farmer's user ID
+     */
+    async getFarmerQuickStats(userId) {
+        try {
+            return await this.get(`/farmers/${userId}/quick-stats`);
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn(`⚠️ Farmer quick stats for user ${userId} not found, returning mock data`);
+                return {
+                    bestPerformingFarm: "My Primary Farm",
+                    topCropVariety: "SC627",
+                    seasonProgress: 62,
+                    weatherFavorability: 79,
+                    avgSoilHealth: 76,
+                    irrigationEfficiency: 88,
+                    pestRiskLevel: "Low",
+                    harvestReadiness: "18%",
+                    totalFarms: 2,
+                    totalArea: 23.7,
+                    currentSeasonYield: 3.8,
+                    lastUpdated: new Date().toISOString(),
+                    note: 'Demo data for farmer'
+                };
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Get insights and recommendations with optional user context
+     * @param {number|null} farmId - Farm ID (null for all farms)
+     * @param {string} dateRange - Date range for analysis
+     * @param {number|null} userId - User ID for farmer-specific insights
+     */
+    async getInsightsAndRecommendations(farmId = null, dateRange = '6months', userId = null) {
+        try {
+            const params = new URLSearchParams();
+            if (farmId) params.append('farmId', farmId);
+            if (dateRange) params.append('dateRange', dateRange);
+            if (userId) params.append('userId', userId);
+
+            const endpoint = userId
+                ? `/farmers/${userId}/insights-recommendations?${params}`
+                : `/analytics/insights-recommendations?${params}`;
+
+            return await this.get(endpoint);
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn('⚠️ Insights & recommendations endpoint not found, returning mock data');
+                return this.getMockInsightsRecommendations(userId !== null);
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Get farms owned by a specific farmer
+     * @param {number} userId - Farmer's user ID
+     */
+    async getFarmerFarms(userId) {
+        try {
+            return await this.get(`/farmers/${userId}/farms`);
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn(`⚠️ Farmer farms for user ${userId} not found, returning mock data`);
+                return [
+                    {
+                        id: 1,
+                        name: "My Primary Farm",
+                        location: "Harare",
+                        area: 15.5,
+                        status: "ACTIVE",
+                        cropVariety: "SC627",
+                        plantingDate: "2024-11-15",
+                        expectedHarvest: "2025-04-20",
+                        soilType: "Clay Loam",
+                        irrigationType: "Drip"
+                    },
+                    {
+                        id: 2,
+                        name: "Secondary Plot",
+                        location: "Chitungwiza",
+                        area: 8.2,
+                        status: "ACTIVE",
+                        cropVariety: "SC627",
+                        plantingDate: "2024-11-20",
+                        expectedHarvest: "2025-04-25",
+                        soilType: "Sandy Clay",
+                        irrigationType: "Sprinkler"
+                    }
+                ];
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Get analytics data with role-based filtering
+     * Enhanced version that supports farmer-specific parameters
+     */
+    async getAnalytics(type, params = {}) {
+        try {
+            const queryParams = new URLSearchParams();
+
+            // Add all parameters to query string
+            Object.keys(params).forEach(key => {
+                if (params[key] !== null && params[key] !== undefined) {
+                    if (Array.isArray(params[key])) {
+                        // Handle array parameters (like farmIds)
+                        params[key].forEach(value => queryParams.append(key, value));
+                    } else {
+                        queryParams.append(key, params[key]);
+                    }
+                }
+            });
+
+            const endpoint = params.userId
+                ? `/farmers/${params.userId}/analytics/${type}?${queryParams}`
+                : `/analytics/${type}?${queryParams}`;
+
+            return await this.get(endpoint);
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn(`⚠️ Analytics endpoint for ${type} not found, returning enhanced mock data`);
+                return this.getMockAnalyticsData(type, params);
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Get farmer's yield history
+     * @param {number} userId - Farmer's user ID
+     * @param {string} dateRange - Date range for history
+     */
+    async getFarmerYieldHistory(userId, dateRange = '12months') {
+        try {
+            return await this.get(`/farmers/${userId}/yield-history?dateRange=${dateRange}`);
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn(`⚠️ Farmer yield history for user ${userId} not found, returning mock data`);
+                return this.generateMockYieldHistory(dateRange);
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Get farmer's predictions
+     * @param {number} userId - Farmer's user ID
+     */
+    async getFarmerPredictions(userId) {
+        try {
+            return await this.get(`/farmers/${userId}/predictions`);
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn(`⚠️ Farmer predictions for user ${userId} not found, returning mock data`);
+                return [
+                    {
+                        id: 1,
+                        farmId: 1,
+                        farmName: "My Primary Farm",
+                        predictedYield: 4.2,
+                        confidence: 87,
+                        predictionDate: new Date().toISOString(),
+                        harvestDate: '2025-04-20',
+                        status: 'ACTIVE',
+                        notes: 'Good weather conditions expected'
+                    },
+                    {
+                        id: 2,
+                        farmId: 2,
+                        farmName: "Secondary Plot",
+                        predictedYield: 3.8,
+                        confidence: 82,
+                        predictionDate: new Date().toISOString(),
+                        harvestDate: '2025-04-25',
+                        status: 'ACTIVE',
+                        notes: 'Monitor soil moisture levels'
+                    }
+                ];
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Get farmer's weather data
+     * @param {number} userId - Farmer's user ID
+     * @param {string} startDate - Start date
+     * @param {string} endDate - End date
+     */
+    async getFarmerWeatherData(userId, startDate, endDate) {
+        try {
+            const params = new URLSearchParams();
+            if (startDate) params.append('startDate', startDate);
+            if (endDate) params.append('endDate', endDate);
+
+            return await this.get(`/farmers/${userId}/weather?${params}`);
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn(`⚠️ Farmer weather data for user ${userId} not found, returning mock data`);
+                return this.getMockWeatherData(startDate, endDate);
+            }
+            throw error;
+        }
+    }
+
+// =====================================
+// ENHANCED MOCK DATA GENERATORS
+// =====================================
+
+    /**
+     * Generate mock insights and recommendations based on user type
+     * @param {boolean} isFarmer - Whether the user is a farmer
+     */
+    getMockInsightsRecommendations(isFarmer = false) {
+        if (isFarmer) {
+            return {
+                insights: [
+                    "Your farms are performing 8% above your historical average",
+                    "Weather conditions in your area have been favorable this month",
+                    "Your primary farm shows optimal soil moisture levels",
+                    "Prediction accuracy for your farms has improved to 84%",
+                    "Your crop variety SC627 is showing excellent growth patterns"
+                ],
+                recommendations: [
+                    "Apply nitrogen fertilizer to your secondary plot within the next week",
+                    "Schedule irrigation for your primary farm this weekend",
+                    "Monitor pest activity in both farms over the next 10 days",
+                    "Plan harvesting activities for optimal yield timing in April",
+                    "Consider soil testing for your secondary plot next month"
+                ],
+                priority: {
+                    high: 1,
+                    medium: 3,
+                    low: 1
+                },
+                farmerSpecific: true,
+                lastUpdated: new Date().toISOString()
+            };
+        } else {
+            return {
+                insights: [
+                    "System-wide yield performance is 12% above target",
+                    "Weather conditions have been favorable across all regions",
+                    "Soil health indicators show optimal conditions in 78% of farms",
+                    "Prediction accuracy has improved to 87.5% with recent updates",
+                    "Overall irrigation efficiency has increased by 5% this season"
+                ],
+                recommendations: [
+                    "Implement system-wide fertilizer optimization program",
+                    "Deploy irrigation alerts for farms in dry regions",
+                    "Schedule pest monitoring across all monitored farms",
+                    "Prepare harvest optimization recommendations for farmers",
+                    "Update ML models with latest agricultural data"
+                ],
+                priority: {
+                    high: 2,
+                    medium: 5,
+                    low: 3
+                },
+                farmerSpecific: false,
+                lastUpdated: new Date().toISOString()
+            };
+        }
+    }
+
+    /**
+     * Generate mock yield history data
+     * @param {string} dateRange - Date range for history
+     */
+    generateMockYieldHistory(dateRange = '12months') {
+        const months = {
+            '6months': 6,
+            '12months': 12,
+            '24months': 24
+        };
+
+        const monthCount = months[dateRange] || 12;
+        const history = [];
+
+        for (let i = monthCount - 1; i >= 0; i--) {
+            const date = new Date();
+            date.setMonth(date.getMonth() - i);
+
+            history.push({
+                month: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+                yield: Number((3.0 + Math.random() * 2.0).toFixed(1)),
+                target: 4.0,
+                farmId: Math.random() > 0.5 ? 1 : 2,
+                farmName: Math.random() > 0.5 ? "My Primary Farm" : "Secondary Plot",
+                date: date.toISOString()
+            });
+        }
+
+        return history;
+    }
+
+    /**
+     * Enhanced mock analytics data with farmer-specific context
+     */
+    getMockAnalyticsData(type, params = {}) {
+        const isFarmer = params.userId !== null && params.userId !== undefined;
+        const rolePrefix = isFarmer ? "Your farms show" : "System analysis indicates";
+
+        const baseInsights = [
+            `${rolePrefix} average yield performance is within expected range`,
+            `Weather conditions have been favorable for ${isFarmer ? 'your area' : 'most regions'}`,
+            `${isFarmer ? 'Your' : 'Overall'} soil health indicators are optimal`,
+            `Prediction accuracy has improved with recent model updates`,
+            `${isFarmer ? 'Your farming practices' : 'System-wide practices'} show continuous improvement`
+        ];
+
+        const baseRecommendations = [
+            `Consider optimizing irrigation schedule ${isFarmer ? 'for your farms' : 'across monitored farms'}`,
+            `Monitor crop growth stages closely ${isFarmer ? 'in your plots' : 'system-wide'}`,
+            `Prepare for upcoming harvest season`,
+            `${isFarmer ? 'Your farms would benefit from' : 'Recommended:'} soil testing for nutrient levels`,
+            `${isFarmer ? 'Consider attending' : 'Organize'} agricultural best practices workshops`
+        ];
+
+        const mockData = {
+            insights: baseInsights,
+            recommendations: baseRecommendations,
+            userContext: {
+                isFarmer,
+                userId: params.userId,
+                farmIds: params.farmIds,
+                dateRange: params.dateRange
+            }
+        };
+
+        switch (type) {
+            case 'yield-trends':
+                return {
+                    ...mockData,
+                    chartData: this.generateRoleBasedYieldTrends(isFarmer),
+                    summary: {
+                        averageYield: isFarmer ? 3.8 : 4.2,
+                        yieldGrowth: isFarmer ? 8.5 : 12.5,
+                        bestPerformingFarm: isFarmer ? "My Primary Farm" : "Demo Farm A",
+                        totalFarmsAnalyzed: isFarmer ? 2 : 22,
+                        personalizedFor: isFarmer ? `User ${params.userId}` : 'System-wide'
+                    }
+                };
+
+            case 'farm-performance':
+                if (isFarmer) {
+                    return {
+                        ...mockData,
+                        chartData: [
+                            { farm: 'My Primary Farm', yield: 4.1, efficiency: 88, area: 15.5 },
+                            { farm: 'Secondary Plot', yield: 3.5, efficiency: 82, area: 8.2 }
+                        ],
+                        summary: {
+                            topPerformer: "My Primary Farm",
+                            averageEfficiency: 85,
+                            totalArea: 23.7,
+                            farmsManaged: 2
+                        }
+                    };
+                } else {
+                    return {
+                        ...mockData,
+                        chartData: [
+                            { farm: 'Farm A', yield: 4.8, efficiency: 92, area: 25 },
+                            { farm: 'Farm B', yield: 4.2, efficiency: 85, area: 18 },
+                            { farm: 'Farm C', yield: 3.9, efficiency: 78, area: 32 },
+                            { farm: 'Farm D', yield: 4.5, efficiency: 88, area: 22 },
+                            { farm: 'Farm E', yield: 4.1, efficiency: 82, area: 28 }
+                        ],
+                        summary: { topPerformer: "Farm A", averageEfficiency: 85, totalArea: 125 }
+                    };
+                }
+
+            case 'prediction-accuracy':
+                return {
+                    ...mockData,
+                    chartData: [
+                        { month: 'Jan', accuracy: isFarmer ? 79 : 82, predictions: isFarmer ? 4 : 45 },
+                        { month: 'Feb', accuracy: isFarmer ? 82 : 85, predictions: isFarmer ? 6 : 52 },
+                        { month: 'Mar', accuracy: isFarmer ? 85 : 87, predictions: isFarmer ? 5 : 48 },
+                        { month: 'Apr', accuracy: isFarmer ? 87 : 89, predictions: isFarmer ? 8 : 61 },
+                        { month: 'May', accuracy: isFarmer ? 84 : 87, predictions: isFarmer ? 7 : 58 },
+                        { month: 'Jun', accuracy: isFarmer ? 89 : 91, predictions: isFarmer ? 9 : 64 }
+                    ],
+                    summary: {
+                        currentAccuracy: isFarmer ? 84.3 : 87.5,
+                        improvement: isFarmer ? 2.8 : 3.2,
+                        totalPredictions: isFarmer ? 39 : 328,
+                        userSpecific: isFarmer
+                    }
+                };
+
+            case 'weather-analysis':
+                return {
+                    ...mockData,
+                    chartData: this.generateMockWeatherData(),
+                    summary: {
+                        averageTemperature: 25.6,
+                        totalRainfall: 56,
+                        averageHumidity: 67.3,
+                        locationContext: isFarmer ? 'Your farm locations' : 'All monitored regions'
+                    }
+                };
+
+            case 'crop-health':
+                return {
+                    ...mockData,
+                    chartData: [
+                        { metric: 'Healthy', value: isFarmer ? 72 : 78, color: '#22c55e' },
+                        { metric: 'At Risk', value: isFarmer ? 20 : 15, color: '#f59e0b' },
+                        { metric: 'Critical', value: isFarmer ? 8 : 7, color: '#ef4444' }
+                    ],
+                    summary: {
+                        healthyPercentage: isFarmer ? 72 : 78,
+                        atRiskFarms: isFarmer ? 20 : 15,
+                        criticalIssues: isFarmer ? 8 : 7,
+                        scope: isFarmer ? 'Your farms' : 'All farms'
+                    }
+                };
+
+            default:
+                return mockData;
+        }
+    }
+
+    /**
+     * Generate role-based yield trends data
+     * @param {boolean} isFarmer - Whether the user is a farmer
+     */
+    generateRoleBasedYieldTrends(isFarmer = false) {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
+        const baseYield = isFarmer ? 3.2 : 3.5;
+        const variance = isFarmer ? 1.2 : 2.0;
+        const target = isFarmer ? 4.0 : 4.5;
+
+        return months.map(month => ({
+            month,
+            yield: Number((baseYield + Math.random() * variance).toFixed(1)),
+            predicted: Number((baseYield + 0.3 + Math.random() * (variance * 0.8)).toFixed(1)),
+            target: target,
+            context: isFarmer ? 'personal' : 'system'
+        }));
+    }
+
+    /**
+     * Get farmer's recent activity
+     * @param {number} userId - Farmer's user ID
+     * @param {number} limit - Number of activities to return
+     */
+    async getFarmerRecentActivity(userId, limit = 10) {
+        try {
+            return await this.get(`/farmers/${userId}/recent-activity?limit=${limit}`);
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn(`⚠️ Farmer recent activity for user ${userId} not found, returning mock data`);
+                return [
+                    {
+                        id: 1,
+                        description: "Yield prediction updated for My Primary Farm",
+                        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+                        type: 'prediction',
+                        priority: 'medium',
+                        farmId: 1,
+                        farmName: "My Primary Farm"
+                    },
+                    {
+                        id: 2,
+                        description: "Weather alert issued for your area",
+                        timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+                        type: 'alert',
+                        priority: 'high',
+                        farmId: null,
+                        farmName: null
+                    },
+                    {
+                        id: 3,
+                        description: "Irrigation recommendation sent for Secondary Plot",
+                        timestamp: new Date(Date.now() - 8 * 60 * 60 * 1000).toISOString(),
+                        type: 'recommendation',
+                        priority: 'medium',
+                        farmId: 2,
+                        farmName: "Secondary Plot"
+                    },
+                    {
+                        id: 4,
+                        description: "Soil test results received for My Primary Farm",
+                        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+                        type: 'soil',
+                        priority: 'low',
+                        farmId: 1,
+                        farmName: "My Primary Farm"
+                    },
+                    {
+                        id: 5,
+                        description: "Fertilizer application scheduled",
+                        timestamp: new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString(),
+                        type: 'fertilizer',
+                        priority: 'medium',
+                        farmId: 2,
+                        farmName: "Secondary Plot"
+                    }
+                ].slice(0, limit);
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Get farmer's alerts
+     * @param {number} userId - Farmer's user ID
+     */
+    async getFarmerAlerts(userId) {
+        try {
+            return await this.get(`/farmers/${userId}/alerts`);
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn(`⚠️ Farmer alerts for user ${userId} not found, returning mock data`);
+                return [
+                    {
+                        id: 1,
+                        title: "Weather Alert",
+                        message: "Heavy rainfall expected in your area this weekend",
+                        type: "weather",
+                        priority: "high",
+                        timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+                        farmIds: [1, 2],
+                        actionRequired: true
+                    },
+                    {
+                        id: 2,
+                        title: "Irrigation Reminder",
+                        message: "Secondary Plot requires irrigation within 48 hours",
+                        type: "irrigation",
+                        priority: "medium",
+                        timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+                        farmIds: [2],
+                        actionRequired: true
+                    }
+                ];
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Get farmer's upcoming tasks
+     * @param {number} userId - Farmer's user ID
+     */
+    async getFarmerTasks(userId) {
+        try {
+            return await this.get(`/farmers/${userId}/tasks`);
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn(`⚠️ Farmer tasks for user ${userId} not found, returning mock data`);
+                return [
+                    {
+                        id: 1,
+                        title: "Apply fertilizer to Secondary Plot",
+                        description: "Apply nitrogen fertilizer as recommended",
+                        dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+                        priority: "high",
+                        farmId: 2,
+                        farmName: "Secondary Plot",
+                        status: "pending",
+                        category: "fertilization"
+                    },
+                    {
+                        id: 2,
+                        title: "Schedule irrigation for Primary Farm",
+                        description: "Set up weekend irrigation schedule",
+                        dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+                        priority: "medium",
+                        farmId: 1,
+                        farmName: "My Primary Farm",
+                        status: "pending",
+                        category: "irrigation"
+                    },
+                    {
+                        id: 3,
+                        title: "Pest monitoring inspection",
+                        description: "Check both farms for pest activity",
+                        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                        priority: "medium",
+                        farmId: null,
+                        farmName: "All Farms",
+                        status: "pending",
+                        category: "monitoring"
+                    }
+                ];
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Enhanced health check that includes farmer-specific endpoints
+     */
+    async healthCheck() {
+        try {
+            const basicHealth = await this.get('/health');
+
+            // Test farmer-specific endpoints if we have a test user ID
+            const farmerEndpoints = [
+                '/farmers/1/dashboard/stats',
+                '/farmers/1/quick-stats',
+                '/farmers/1/farms',
+                '/farmers/1/insights-recommendations'
+            ];
+
+            const farmerHealthResults = await Promise.allSettled(
+                farmerEndpoints.map(endpoint =>
+                    this.get(endpoint).catch(error => ({ error: error.status }))
+                )
+            );
+
+            return {
+                ...basicHealth,
+                farmerEndpoints: farmerHealthResults.map((result, index) => ({
+                    endpoint: farmerEndpoints[index],
+                    status: result.status === 'fulfilled' ? 'available' : 'unavailable',
+                    error: result.reason?.status
+                }))
+            };
+        } catch (error) {
+            return {
+                status: 'API not available',
+                endpoints: Array.from(this.failedEndpoints),
+                farmerSupport: 'unknown'
+            };
+        }
+    }
+
+// Add this method to override the existing getFarms method to support farmer context
+    async getFarms(farmerId = null) {
+        try {
+            if (farmerId) {
+                // If farmerId is provided, get farms for that specific farmer
+                return await this.getFarmerFarms(farmerId);
+            } else {
+                // Get all farms (admin view)
+                const params = '';
+                const response = await this.get(`/farms${params}`);
+                return Array.isArray(response) ? response : (response?.content || []);
+            }
+        } catch (error) {
+            if (error.status === 404) {
+                console.warn('⚠️ Farms endpoint not found, returning mock data');
+                if (farmerId) {
+                    return this.getFarmerFarms(farmerId);
+                } else {
+                    return [
+                        { id: 1, name: "Sunrise Farm", location: "Harare", area: 25.5, status: "ACTIVE" },
+                        { id: 2, name: "Valley View Farm", location: "Bulawayo", area: 18.2, status: "ACTIVE" },
+                        { id: 3, name: "Green Acres", location: "Mutare", area: 32.1, status: "ACTIVE" }
+                    ];
+                }
+            }
+            throw error;
+        }
+    }
 
 // ===========================================
 // PREDICTION APIs

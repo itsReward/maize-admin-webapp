@@ -329,7 +329,7 @@ const WeatherPage = () => {
         </div>
 
         {/* Error Messages */}
-        {(currentError || historyError || farmCurrentError) && (
+        {/*{(currentError || historyError || farmCurrentError) && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <div className="flex items-center">
                 <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
@@ -341,7 +341,7 @@ const WeatherPage = () => {
                 </div>
               </div>
             </div>
-        )}
+        )}*/}
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

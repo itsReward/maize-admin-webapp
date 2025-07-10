@@ -69,7 +69,7 @@ function App() {
                 } />
 
                 <Route path="analytics" element={
-                  <RoleProtectedRoute adminOnly={true}>
+                  <RoleProtectedRoute requiredRoles={['ADMIN', 'FARMER']}>
                     <AnalyticsPage />
                   </RoleProtectedRoute>
                 } />
